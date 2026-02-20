@@ -1,0 +1,68 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Media {
+  id                       String   @id @default(cuid())
+  name                     String
+  toneDescription          String
+  writingStyle             String
+  doRules                  String   // JSON string array
+  dontRules                String   // JSON string array
+  productStructureTemplate String
+  defaultProductWordCount  Int      @default(800)
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
+
+  generatedCards GeneratedProductCard[]
+}
+
+model ProductIntelligence {
+  id                 String   @id @default(cuid())
+  asin               String
+  marketplace        String   @default("amazon.fr")
+  productTitle       String   @default("")
+  productBrand       String   @default("")
+  productPrice       String   @default("")
+  productImageUrl    String   @default("")
+  positioningSummary String   @default("")
+  keyFeatures        String   @default("[]")
+  detectedUsages     String   @default("[]")
+  recurringProblems  String   @default("[]")
+  buyerProfiles      String   @default("[]")
+  sentimentScore     Float    @default(0)
+  strengthPoints     String   @default("[]")
+  weaknessPoints     String   @default("[]")
+  remarkableQuotes   String   @default("[]")
+  rawProductJson     String   @default("{}")
+  rawReviewsJson     String   @default("[]")
+  reviewCount        Int      @default(0)
+  analyzed           Boolean  @default(false)
+  createdAt          DateTime @default(now())
+
+  generatedCards GeneratedProductCard[]
+
+  @@unique([asin, marketplace])
+}
+
+model GeneratedProductCard {
+  id             String   @id @default(cuid())
+  asin           String
+  keyword        String
+  wordCount      Int
+  contentHtml    String
+  promptUsed     String
+  modelUsed      String   @default("gpt-4o")
+  tokensUsed     Int      @default(0)
+  createdAt      DateTime @default(now())
+
+  media          Media              @relation(fields: [mediaId], references: [id])
+  mediaId        String
+  intelligence   ProductIntelligence @relation(fields: [intelligenceId], references: [id])
+  intelligenceId String
+}
