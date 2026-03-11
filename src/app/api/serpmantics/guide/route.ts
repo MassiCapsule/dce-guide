@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
 
 const SERPMANTICS_HOST = "https://app.serpmantics.com";
 const MAX_POLL_ATTEMPTS = 15;
 const POLL_INTERVAL_MS = 3000;
 
 export async function POST(req: NextRequest) {
-  const apiKey = process.env.SERPMANTICS_API_KEY;
+  const dbConfig = await prisma.appConfig.findFirst({ where: { key: "serpmantics_api_key" } });
+  const apiKey = dbConfig?.value || process.env.SERPMANTICS_API_KEY;
   if (!apiKey) {
     return NextResponse.json(
       { error: "SERPMANTICS_API_KEY non configuree" },

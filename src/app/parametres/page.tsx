@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { Save, Check } from "lucide-react";
+import { Input } from "@/components/ui/input";
 import { Header } from "@/components/layout/header";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -33,13 +34,15 @@ interface DailyCost {
 
 export default function ParametresPage() {
   const [model, setModel] = useState("gpt-4o");
-  const [keys, setKeys] = useState<{ openai: string; apify: string; serpmantics: string }>({ openai: "", apify: "", serpmantics: "" });
+  const [keys, setKeys] = useState<{ openai: string; apify: string }>({ openai: "", apify: "" });
   const [daily, setDaily] = useState<DailyCost | null>(null);
   const [saving, setSaving] = useState(false);
   const [generationPrompt, setGenerationPrompt] = useState("");
   const [analysisPrompt, setAnalysisPrompt] = useState("");
   const [promptTab, setPromptTab] = useState<"generation" | "analysis">("generation");
   const [promptSaved, setPromptSaved] = useState(false);
+  const [serpmanticsKey, setSerpmanticsKey] = useState("");
+  const [serpmanticsKeySaved, setSerpmanticsKeySaved] = useState(false);
 
   useEffect(() => {
     fetch("/api/config")
@@ -48,6 +51,7 @@ export default function ParametresPage() {
         if (data.openai_model) setModel(data.openai_model);
         if (data.prompt_generation) setGenerationPrompt(data.prompt_generation);
         if (data.prompt_analysis) setAnalysisPrompt(data.prompt_analysis);
+        if (data.serpmantics_api_key) setSerpmanticsKey(data.serpmantics_api_key);
       });
     fetch("/api/config/keys").then((r) => r.json()).then(setKeys);
     fetch("/api/stats/daily-cost").then((r) => r.json()).then(setDaily);
@@ -89,6 +93,16 @@ export default function ParametresPage() {
     setTimeout(() => setPromptSaved(false), 2000);
   }, [generationPrompt, analysisPrompt]);
 
+  const saveSerpmanticsKey = async () => {
+    await fetch("/api/config", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ key: "serpmantics_api_key", value: serpmanticsKey }),
+    });
+    setSerpmanticsKeySaved(true);
+    setTimeout(() => setSerpmanticsKeySaved(false), 2000);
+  };
+
   return (
     <>
       <Header title="Parametres" />
@@ -115,11 +129,24 @@ export default function ParametresPage() {
                     {keys.apify || "Non configuree"}
                   </code>
                 </div>
-                <div className="flex items-center justify-between">
+                <div className="space-y-1.5">
                   <Label>Serpmantics</Label>
-                  <code className="text-xs bg-muted px-2 py-1 rounded font-mono">
-                    {keys.serpmantics || "Non configuree"}
-                  </code>
+                  <div className="flex gap-2">
+                    <Input
+                      type="password"
+                      value={serpmanticsKey}
+                      onChange={(e) => setSerpmanticsKey(e.target.value)}
+                      placeholder="Colle ta clé API ici..."
+                      className="flex-1 font-mono text-xs"
+                    />
+                    <Button size="sm" onClick={saveSerpmanticsKey}>
+                      {serpmanticsKeySaved ? (
+                        <Check className="h-3.5 w-3.5 text-green-600" />
+                      ) : (
+                        <Save className="h-3.5 w-3.5" />
+                      )}
+                    </Button>
+                  </div>
                 </div>
               </CardContent>
             </Card>
