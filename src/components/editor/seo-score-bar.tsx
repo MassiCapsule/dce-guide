@@ -79,9 +79,9 @@ export function SeoScoreBar({
       {/* Keyword pills */}
       {keywords.length > 0 && (
         <div className="flex flex-wrap gap-1.5">
-          {keywords.map((kw, index) => (
+          {keywords.map((kw) => (
             <span
-              key={index}
+              key={kw.expression}
               className={cn(
                 "text-xs px-2 py-0.5 rounded-full border",
                 kw.ok
