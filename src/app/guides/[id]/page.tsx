@@ -125,7 +125,6 @@ export default function GuideDetailPage() {
               initialHtml={planHtml}
               seoScore={72}
               seoKeywords={planSeoKeywords}
-              meta={metaFixture}
             />
           </TabsContent>
 

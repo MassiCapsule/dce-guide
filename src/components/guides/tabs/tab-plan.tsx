@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { Loader2 } from "lucide-react";
 import { SeoScoreBar } from "@/components/editor/seo-score-bar";
-import { MetaFields } from "@/components/editor/meta-fields";
 import { RichEditor } from "@/components/editor/rich-editor";
 import { Button } from "@/components/ui/button";
 
@@ -18,30 +17,18 @@ interface TabPlanProps {
   initialHtml: string;
   seoScore: number | null;
   seoKeywords: SeoKeyword[];
-  meta: {
-    slug: string;
-    metaTitle: string;
-    metaDescription: string;
-    imageCaption: string;
-  };
 }
 
 export function TabPlan({
   initialHtml,
   seoScore,
   seoKeywords,
-  meta: metaProp,
 }: TabPlanProps) {
   const [html, setHtml] = useState<string>(initialHtml);
-  const [meta, setMeta] = useState(metaProp);
   const [score, setScore] = useState<number | null>(seoScore);
   const [keywords, setKeywords] = useState<SeoKeyword[]>(seoKeywords);
   const [scoreLoading, setScoreLoading] = useState<boolean>(false);
   const [generating, setGenerating] = useState<boolean>(false);
-
-  const handleMetaChange = (field: string, value: string) => {
-    setMeta((prev) => ({ ...prev, [field]: value }));
-  };
 
   const handleRecalculate = async () => {
     setScoreLoading(true);
@@ -63,14 +50,6 @@ export function TabPlan({
         keywords={keywords}
         onRecalculate={handleRecalculate}
         loading={scoreLoading}
-      />
-
-      <MetaFields
-        slug={meta.slug}
-        metaTitle={meta.metaTitle}
-        metaDescription={meta.metaDescription}
-        imageCaption={meta.imageCaption}
-        onChange={handleMetaChange}
       />
 
       <RichEditor content={html} onChange={setHtml} />
