@@ -28,7 +28,8 @@ Générateur de guides d'achat SEO avec fiches produits Amazon.
 ## Stack technique
 - **Next.js 14** App Router + TypeScript
 - **SQLite** via Prisma ORM (`dev.db`)
-- **Tailwind CSS** + shadcn/ui (Radix)
+- **Tailwind CSS** + shadcn/ui (Radix) + **@tailwindcss/typography**
+- **TipTap v3** (éditeur WYSIWYG — installé le 2026-03-13)
 - **OpenAI** (génération + analyse)
 - **Apify** (scraping Amazon)
 - **Serpmantics** (guide sémantique + mots-clés)
@@ -40,9 +41,16 @@ Générateur de guides d'achat SEO avec fiches produits Amazon.
 ### Frontend
 | Fichier | Rôle |
 |---------|------|
-| `src/components/guides/guide-form.tsx` | Formulaire création guides (mot-clé, media, produits, mots-clés SEO) |
+| `src/components/guides/guide-form.tsx` | Formulaire création guides — appelle Serpmantics automatiquement au clic "Créer le guide" |
 | `src/app/parametres/page.tsx` | Page config : clés API, modèle OpenAI, prompts |
 | `src/hooks/use-guide-generation.ts` | Polling du pipeline de génération |
+| `src/components/editor/rich-editor.tsx` | Éditeur WYSIWYG TipTap v3 (H2/H3, gras, listes, tableau) |
+| `src/components/editor/seo-score-bar.tsx` | Barre score SEO Serpmantics + pills mots-clés |
+| `src/components/editor/meta-fields.tsx` | Champs méta : slug, meta title, meta desc, légende image |
+| `src/components/guides/tabs/tab-overview.tsx` | Onglet Vue d'ensemble du guide |
+| `src/components/guides/tabs/tab-products.tsx` | Onglet liste des produits |
+| `src/components/guides/tabs/tab-plan.tsx` | Onglet Plan : SeoScoreBar + MetaFields + RichEditor |
+| `src/components/guides/tabs/tab-article.tsx` | Onglet Article : SeoScoreBar + MetaFields + RichEditor |
 
 ### API Routes
 | Route | Méthode | Rôle |
@@ -167,7 +175,33 @@ Crée un profil média par défaut "Blog Test Produit".
 
 ## Git
 
-Pas encore de remote configuré (à faire lors d'une prochaine session).
+Remote : `https://github.com/MassiCapsule/dce-guide`
+
+```powershell
+git push
+```
+
+---
+
+## Workflow Serpmantics (guide-form.tsx)
+
+Au clic "Créer le guide" :
+1. Appel `POST /api/serpmantics/guide` — attend **1 min**, puis poll toutes les **3s**, timeout **5 min**
+2. Récupère les mots-clés automatiquement
+3. Crée le guide en DB et redirige vers `/guides/[id]`
+
+---
+
+## Refonte page /guides/[id] (en cours — 2026-03-13)
+
+Nouvelle architecture à 4 onglets (shadcn/ui Tabs) :
+- **Vue d'ensemble** : infos guide, critères de sélection, progression des étapes
+- **Produits** : liste des produits avec statut (done/pending/error)
+- **Plan** : SeoScoreBar + MetaFields + RichEditor TipTap
+- **Article** : SeoScoreBar + MetaFields + RichEditor TipTap
+
+Données fictives dans `/fixtures/` pour le développement UX (sans appels API réels).
+Plans : `docs/plans/2026-03-13-guide-editor-redesign-design.md` et `docs/plans/2026-03-13-guide-editor-redesign.md`
 
 ---
 
@@ -175,5 +209,6 @@ Pas encore de remote configuré (à faire lors d'une prochaine session).
 
 | Date | Feature |
 |------|---------|
-| 2026-03-11 | Bouton "Valider" Serpmantics dans guide-form (spec : `docs/plans/2026-03-11-serpmantics-validate-button.md`) |
-| 2026-03-13 | Demande : rendre la clé Serpmantics éditable depuis /paramètres (en cours) |
+| 2026-03-11 | Bouton "Valider" Serpmantics dans guide-form |
+| 2026-03-13 | Suppression section mots-clés manuels — Serpmantics automatique au submit |
+| 2026-03-13 | Refonte /guides/[id] : 4 onglets + TipTap WYSIWYG + SeoScoreBar (en cours) |
