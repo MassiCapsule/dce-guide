@@ -1,5 +1,7 @@
 'use client'
 
+import { useEffect } from 'react'
+import { type ReactNode } from 'react'
 import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Underline from '@tiptap/extension-underline'
@@ -16,6 +18,26 @@ interface RichEditorProps {
   onChange?: (html: string) => void
   editable?: boolean
   className?: string
+}
+
+function toolbarButton(
+  active: boolean,
+  onClick: () => void,
+  icon: ReactNode,
+  label: string
+) {
+  return (
+    <Button
+      type="button"
+      variant={active ? 'default' : 'ghost'}
+      size="icon"
+      onClick={onClick}
+      title={label}
+      aria-label={label}
+    >
+      {icon}
+    </Button>
+  )
 }
 
 export function RichEditor({
@@ -44,25 +66,13 @@ export function RichEditor({
     immediatelyRender: false,
   })
 
-  if (!editor) return null
+  useEffect(() => {
+    if (editor && content !== editor.getHTML()) {
+      editor.commands.setContent(content)
+    }
+  }, [content, editor])
 
-  const toolbarButton = (
-    active: boolean,
-    onClick: () => void,
-    icon: React.ReactNode,
-    label: string
-  ) => (
-    <Button
-      type="button"
-      variant={active ? 'default' : 'ghost'}
-      size="icon"
-      onClick={onClick}
-      title={label}
-      aria-label={label}
-    >
-      {icon}
-    </Button>
-  )
+  if (!editor) return null
 
   return (
     <div className={cn('border rounded-md overflow-hidden', className)}>
@@ -87,7 +97,7 @@ export function RichEditor({
             'Souligné'
           )}
 
-          <div className="w-px bg-border mx-1" />
+          <div className="w-px h-5 bg-border mx-1 self-center" />
 
           {toolbarButton(
             editor.isActive('heading', { level: 2 }),
@@ -102,7 +112,7 @@ export function RichEditor({
             'Titre 3'
           )}
 
-          <div className="w-px bg-border mx-1" />
+          <div className="w-px h-5 bg-border mx-1 self-center" />
 
           {toolbarButton(
             editor.isActive('bulletList'),
@@ -117,7 +127,7 @@ export function RichEditor({
             'Liste numérotée'
           )}
 
-          <div className="w-px bg-border mx-1" />
+          <div className="w-px h-5 bg-border mx-1 self-center" />
 
           {toolbarButton(
             false,
