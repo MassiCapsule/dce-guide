@@ -1,310 +1,143 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState } from "react";
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, Play, Trash2, RefreshCw } from "lucide-react";
+import { ArrowLeft, Trash2 } from "lucide-react";
 import { Header } from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-} from "@/components/ui/card";
-import { GuideProgress } from "@/components/guides/guide-progress";
-import { GuideResults } from "@/components/guides/guide-results";
-import { useGuideGeneration } from "@/hooks/use-guide-generation";
-import { formatCost } from "@/lib/pricing";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { TabOverview } from "@/components/guides/tabs/tab-overview";
+import { TabProducts } from "@/components/guides/tabs/tab-products";
+import { TabPlan } from "@/components/guides/tabs/tab-plan";
+import { TabArticle } from "@/components/guides/tabs/tab-article";
 
-interface GuideData {
-  id: string;
-  title: string;
-  status: string;
-  errorMessage: string;
-  totalCost: number;
-  media: { id: string; name: string };
-  products: {
-    id: string;
-    position: number;
-    intelligence: {
-      id: string;
-      asin: string;
-      productTitle: string;
-      productBrand: string;
-      productPrice: string;
-      productImageUrl: string;
-      analyzed: boolean;
-      createdAt: string;
-    };
-    generatedCard: {
-      id: string;
-      keyword: string;
-      wordCount: number;
-      contentHtml: string;
-    } | null;
-  }[];
-  keywords: {
-    id: string;
-    keyword: string;
-    minOccurrences: number;
-    maxOccurrences: number;
-  }[];
-  createdAt: string;
-}
+// --- Fixture data (UX development — no real API calls) ---
+const guideFixture = {
+  keyword: "meilleurs robots aspirateurs 2025",
+  targetWordCount: 4200,
+  selectionCriteria:
+    "Choisir des produits avec plus de 100 avis, compatibles parquet et carrelage, autonomie supérieure à 90 minutes.",
+  steps: {
+    guide: { status: "done" as const, date: "2026-03-11" },
+    products: { status: "done" as const, date: "2026-03-12" },
+    plan: { status: "in_progress" as const, date: null },
+    article: { status: "locked" as const, date: null },
+  },
+};
+
+const productsFixture = [
+  {
+    id: "prod-1",
+    asin: "B09X3P4QGM",
+    title: "iRobot Roomba j7+",
+    brand: "iRobot",
+    price: "549,99 €",
+    imageUrl: "https://placehold.co/200x200?text=Roomba+j7%2B",
+    reviewCount: 2847,
+    rating: 4.4,
+    status: "done" as const,
+  },
+  {
+    id: "prod-2",
+    asin: "B0BW3TT41M",
+    title: "Roborock S8 Pro Ultra",
+    brand: "Roborock",
+    price: "999,99 €",
+    imageUrl: "https://placehold.co/200x200?text=Roborock+S8",
+    reviewCount: 1243,
+    rating: 4.6,
+    status: "done" as const,
+  },
+  {
+    id: "prod-3",
+    asin: "B0C5MKL8VR",
+    title: "Ecovacs Deebot X2 Omni",
+    brand: "Ecovacs",
+    price: "799,00 €",
+    imageUrl: "https://placehold.co/200x200?text=Deebot+X2",
+    reviewCount: 876,
+    rating: 4.3,
+    status: "pending" as const,
+  },
+];
+
+const planHtml =
+  "<h2>Introduction</h2><p><strong>Brief :</strong> Présenter le sujet, accrocher le lecteur avec les critères clés de choix.</p><p><strong>Mots-clés :</strong> robot aspirateur, meilleur 2025, guide d'achat</p><p><strong>Mots cible :</strong> 300 mots</p><h2>Critères de sélection</h2><p><strong>Brief :</strong> Expliquer sur quoi on juge les produits : autonomie, puissance, navigation.</p><p><strong>Mots-clés :</strong> autonomie, puissance aspiration, cartographie, navigation laser</p><p><strong>Mots cible :</strong> 400 mots</p><h2>Produit 1 — iRobot Roomba j7+</h2><p><strong>Brief :</strong> Présenter le Roomba j7+, ses points forts (évitement d'obstacles) et ses limites.</p><p><strong>Mots-clés :</strong> iRobot, évitement obstacles, vider automatiquement</p><p><strong>Mots cible :</strong> 600 mots</p><h2>Produit 2 — Roborock S8 Pro Ultra</h2><p><strong>Brief :</strong> Présenter le S8 Pro Ultra, le meilleur polyvalent du marché.</p><p><strong>Mots-clés :</strong> Roborock, lavage, station auto-nettoyante</p><p><strong>Mots cible :</strong> 600 mots</p><h2>Produit 3 — Ecovacs Deebot X2 Omni</h2><p><strong>Brief :</strong> Présenter le Deebot X2, design carré pour les coins.</p><p><strong>Mots-clés :</strong> Ecovacs, coins, aspiration et lavage combinés</p><p><strong>Mots cible :</strong> 600 mots</p><h2>FAQ</h2><p><strong>Brief :</strong> 5 questions fréquentes des acheteurs.</p><p><strong>Mots cible :</strong> 400 mots</p><h2>Sommaire</h2><p><strong>Brief :</strong> Liste des produits avec liens internes.</p><p><strong>Mots cible :</strong> 100 mots</p>";
+
+const articleHtml =
+  "<h1>Meilleurs robots aspirateurs 2025 — Comparatif &amp; Avis</h1><p>Choisir le meilleur robot aspirateur en 2025 nécessite de comparer l'autonomie, la puissance d'aspiration et les fonctionnalités avancées comme la navigation laser.</p><h2>1. iRobot Roomba j7+</h2><p>Le Roomba j7+ est le champion de l'évitement d'obstacles. Grâce à sa technologie PrecisionVision, il reconnaît et évite les câbles, chaussures et autres obstacles du quotidien.</p><ul><li>Puissance d'aspiration : 10x supérieure aux modèles standards</li><li>Autonomie : 75 minutes</li><li>Station automatique de vidage incluse</li></ul><h2>2. Roborock S8 Pro Ultra</h2><p>Le Roborock S8 Pro Ultra représente le summum de la polyvalence avec son module combiné aspiration et lavage. Sa station auto-nettoyante est la plus complète du marché.</p><ul><li>Double brosse en caoutchouc pour aspiration optimale</li><li>Système VibraRise pour le lavage</li><li>Navigation laser LiDAR de précision</li></ul><h2>3. Ecovacs Deebot X2 Omni</h2><p>Le Deebot X2 se distingue par sa forme carrée unique qui lui permet d'atteindre les coins des pièces, là où les robots ronds échouent systématiquement.</p><ul><li>Design carré pour les coins difficiles</li><li>Aspiration et lavage combinés</li><li>Navigation TrueMapping avancée</li></ul><h2>FAQ</h2><h3>Quel robot aspirateur choisir pour un appartement ?</h3><p>Pour un appartement, le Roomba j7+ est idéal grâce à sa compacité et son excellent évitement d'obstacles.</p><h3>Les robots aspirateurs fonctionnent-ils sur moquette ?</h3><p>Oui, tous nos modèles sélectionnés sont compatibles moquette avec détection automatique de surface.</p><h2>Sommaire</h2><ol><li><a href='#roomba'>iRobot Roomba j7+</a></li><li><a href='#roborock'>Roborock S8 Pro Ultra</a></li><li><a href='#deebot'>Ecovacs Deebot X2 Omni</a></li></ol>";
+
+const planSeoKeywords = [
+  { expression: "robot aspirateur", target: 8, current: 6, ok: false },
+  { expression: "meilleur 2025", target: 4, current: 4, ok: true },
+  { expression: "autonomie", target: 5, current: 2, ok: false },
+  { expression: "navigation laser", target: 3, current: 0, ok: false },
+  { expression: "puissance aspiration", target: 3, current: 3, ok: true },
+  { expression: "station automatique", target: 2, current: 1, ok: false },
+];
+
+const metaFixture = {
+  slug: "meilleurs-robots-aspirateurs-2025",
+  metaTitle: "Meilleurs robots aspirateurs 2025 — Comparatif & Avis",
+  metaDescription:
+    "Découvrez notre sélection des 5 meilleurs robots aspirateurs 2025. Comparatif complet, avis et guide d'achat pour choisir le modèle idéal.",
+  imageCaption: "Robot aspirateur iRobot Roomba j7+ sur parquet",
+};
+// ---------------------------------------------------------
 
 export default function GuideDetailPage() {
-  const params = useParams();
-  const router = useRouter();
-  const guideId = params.id as string;
-
-  const [guide, setGuide] = useState<GuideData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [deleting, setDeleting] = useState(false);
-
-  const gen = useGuideGeneration();
-
-  const fetchGuide = useCallback(async () => {
-    const res = await fetch(`/api/guides/${guideId}`);
-    if (res.ok) {
-      const data = await res.json();
-      setGuide(data);
-    }
-    setLoading(false);
-  }, [guideId]);
-
-  useEffect(() => {
-    fetchGuide();
-  }, [fetchGuide]);
-
-  // Refresh guide data when generation completes
-  useEffect(() => {
-    if (gen.step === "complete") {
-      fetchGuide();
-    }
-  }, [gen.step, fetchGuide]);
-
-  const handleGenerate = async () => {
-    gen.reset();
-    await gen.startGeneration(guideId);
-  };
-
-  const handleDelete = async () => {
-    setDeleting(true);
-    await fetch(`/api/guides/${guideId}`, { method: "DELETE" });
-    router.push("/guides");
-  };
-
-  if (loading) {
-    return (
-      <>
-        <Header title="Guide" />
-        <main className="p-6">
-          <p className="text-muted-foreground">Chargement...</p>
-        </main>
-      </>
-    );
-  }
-
-  if (!guide) {
-    return (
-      <>
-        <Header title="Guide introuvable" />
-        <main className="p-6">
-          <p className="text-muted-foreground">Ce guide n&apos;existe pas.</p>
-        </main>
-      </>
-    );
-  }
-
-  const canGenerate = guide.status === "draft" || guide.status === "error" || guide.status === "complete";
-  const isGenerating = gen.step !== "idle" && gen.step !== "complete" && gen.step !== "error";
-
-  // Product cards for results
-  const productCards = guide.products
-    .filter((p) => p.generatedCard)
-    .map((p) => ({
-      id: p.generatedCard!.id,
-      keyword: p.generatedCard!.keyword,
-      wordCount: p.generatedCard!.wordCount,
-      contentHtml: p.generatedCard!.contentHtml,
-      intelligence: {
-        id: p.intelligence.id,
-        productTitle: p.intelligence.productTitle,
-        productImageUrl: p.intelligence.productImageUrl,
-      },
-    }));
+  const [activeTab, setActiveTab] = useState("overview");
 
   return (
     <>
-      <Header title="Guide">
+      <Header title="Meilleurs robots aspirateurs 2025">
         <Button variant="outline" size="sm" asChild>
           <Link href="/guides">
             <ArrowLeft className="mr-2 h-3 w-3" />
             Retour
           </Link>
         </Button>
-        {canGenerate && !isGenerating && (
-          <Button size="sm" onClick={handleGenerate}>
-            {guide.status === "complete" ? (
-              <RefreshCw className="mr-2 h-3 w-3" />
-            ) : (
-              <Play className="mr-2 h-3 w-3" />
-            )}
-            {guide.status === "complete" ? "Re-generer" : "Generer"}
-          </Button>
-        )}
-        <Button
-          variant="destructive"
-          size="sm"
-          onClick={handleDelete}
-          disabled={deleting}
-        >
+        <Button variant="destructive" size="sm" disabled>
           <Trash2 className="mr-2 h-3 w-3" />
           Supprimer
         </Button>
       </Header>
 
-      <main className="p-6 space-y-6 max-w-5xl">
-        {/* Guide Info */}
-        <Card>
-          <CardHeader>
-            <CardTitle>{guide.title}</CardTitle>
-            <CardDescription>
-              Media : {guide.media.name} — {guide.products.length} produits — {guide.keywords.length} mots-cles
-            </CardDescription>
-            <div className="flex flex-wrap items-center gap-2 mt-2">
-              <Badge
-                variant={
-                  guide.status === "complete"
-                    ? "default"
-                    : guide.status === "error"
-                      ? "destructive"
-                      : "secondary"
-                }
-              >
-                {guide.status === "complete" ? "Termine" : guide.status === "error" ? "Erreur" : guide.status === "draft" ? "Brouillon" : "En cours"}
-              </Badge>
-              {guide.totalCost > 0 && (
-                <Badge variant="outline" className="font-mono">
-                  {formatCost(guide.totalCost)}
-                </Badge>
-              )}
-              <span className="text-xs text-muted-foreground">
-                Cree le{" "}
-                {new Date(guide.createdAt).toLocaleDateString("fr-FR", {
-                  day: "numeric",
-                  month: "long",
-                  year: "numeric",
-                })}
-              </span>
-            </div>
-          </CardHeader>
-        </Card>
+      <main className="p-6 max-w-5xl">
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <TabsList className="mb-6">
+            <TabsTrigger value="overview">Vue d&apos;ensemble</TabsTrigger>
+            <TabsTrigger value="products">Produits</TabsTrigger>
+            <TabsTrigger value="plan">Plan</TabsTrigger>
+            <TabsTrigger value="article">Article</TabsTrigger>
+          </TabsList>
 
-        {/* Products */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">
-              Produits ({guide.products.length})
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {guide.products.map((p) => {
-                const intel = p.intelligence;
-                const ageMs = Date.now() - new Date(intel.createdAt).getTime();
-                const ageDays = Math.floor(ageMs / (1000 * 60 * 60 * 24));
-                const isFresh = ageDays < 180;
+          <TabsContent value="overview">
+            <TabOverview data={guideFixture} onTabChange={setActiveTab} />
+          </TabsContent>
 
-                return (
-                  <Link
-                    key={p.id}
-                    href={`/intelligence/${intel.id}`}
-                    className="flex items-center gap-3 p-2 rounded-md border hover:bg-muted/50 transition-colors"
-                  >
-                    <span className="text-xs text-muted-foreground w-5 text-right">
-                      {p.position}.
-                    </span>
-                    {intel.productImageUrl ? (
-                      <img
-                        src={intel.productImageUrl}
-                        alt={intel.productTitle}
-                        className="w-10 h-10 object-contain rounded border bg-white flex-shrink-0"
-                      />
-                    ) : (
-                      <div className="w-10 h-10 rounded border bg-muted flex-shrink-0 flex items-center justify-center text-[10px] text-muted-foreground">
-                        ?
-                      </div>
-                    )}
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium line-clamp-1">
-                        {intel.productTitle || intel.asin}
-                      </p>
-                      <div className="flex items-center gap-1.5 mt-1">
-                        {intel.analyzed ? (
-                          <Badge variant="default" className="text-[10px] px-1.5 py-0">
-                            Analyse
-                          </Badge>
-                        ) : (
-                          <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
-                            Non analyse
-                          </Badge>
-                        )}
-                        <Badge
-                          variant={isFresh ? "outline" : "destructive"}
-                          className="text-[10px] px-1.5 py-0"
-                        >
-                          {ageDays < 30 ? "Frais" : ageDays < 180 ? `${ageDays}j` : "Ancien"}
-                        </Badge>
-                        {intel.productPrice && (
-                          <span className="text-[10px] text-muted-foreground font-mono">
-                            {intel.productPrice}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    {p.generatedCard && (
-                      <Badge variant="default" className="text-[10px] px-1.5 py-0 flex-shrink-0">
-                        Fiche generee
-                      </Badge>
-                    )}
-                  </Link>
-                );
-              })}
-            </div>
-          </CardContent>
-        </Card>
+          <TabsContent value="products">
+            <TabProducts products={productsFixture} />
+          </TabsContent>
 
-        {/* Generation Progress */}
-        {isGenerating && (
-          <GuideProgress
-            currentStep={gen.step}
-            currentProduct={gen.currentProduct}
-            totalProducts={gen.totalProducts}
-            error={gen.error}
-          />
-        )}
+          <TabsContent value="plan">
+            <TabPlan
+              initialHtml={planHtml}
+              seoScore={72}
+              seoKeywords={planSeoKeywords}
+              meta={metaFixture}
+            />
+          </TabsContent>
 
-        {/* Error from last generation attempt */}
-        {gen.step === "error" && gen.error && (
-          <GuideProgress
-            currentStep="error"
-            currentProduct={0}
-            totalProducts={0}
-            error={gen.error}
-          />
-        )}
-
-        {/* Results: title + product cards */}
-        {productCards.length > 0 && (
-          <GuideResults
-            guideTitle={guide.title}
-            productCards={productCards}
-          />
-        )}
+          <TabsContent value="article">
+            <TabArticle
+              initialHtml={articleHtml}
+              seoScore={null}
+              seoKeywords={[]}
+              meta={metaFixture}
+            />
+          </TabsContent>
+        </Tabs>
       </main>
     </>
   );
