@@ -1,0 +1,12 @@
+{
+  "score": 72,
+  "maxScore": 100,
+  "keywords": [
+    { "expression": "robot aspirateur", "target": 8, "current": 6, "ok": true },
+    { "expression": "meilleur 2025", "target": 4, "current": 4, "ok": true },
+    { "expression": "autonomie", "target": 5, "current": 2, "ok": false },
+    { "expression": "navigation laser", "target": 3, "current": 0, "ok": false },
+    { "expression": "puissance aspiration", "target": 3, "current": 3, "ok": true },
+    { "expression": "station automatique", "target": 2, "current": 1, "ok": false }
+  ]
+}

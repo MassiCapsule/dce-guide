@@ -1,0 +1,20 @@
+{
+  "id": "fixture-guide-1",
+  "title": "Meilleurs robots aspirateurs 2025",
+  "keyword": "meilleurs robots aspirateurs 2025",
+  "targetWordCount": 4200,
+  "selectionCriteria": "Choisir des produits avec plus de 100 avis, compatibles parquet et carrelage, autonomie supérieure à 90 minutes.",
+  "slug": "meilleurs-robots-aspirateurs-2025",
+  "metaTitle": "Meilleurs robots aspirateurs 2025 — Comparatif & Avis",
+  "metaDescription": "Découvrez notre sélection des 5 meilleurs robots aspirateurs 2025. Comparatif complet, avis et guide d'achat pour choisir le modèle idéal.",
+  "imageCaption": "Robot aspirateur iRobot Roomba j7+ sur parquet",
+  "currentStep": 3,
+  "steps": {
+    "guide": { "status": "done", "date": "2026-03-11" },
+    "products": { "status": "done", "date": "2026-03-12" },
+    "plan": { "status": "in_progress", "date": null },
+    "article": { "status": "locked", "date": null }
+  },
+  "planSeoScore": 72,
+  "articleSeoScore": null
+}

@@ -1,0 +1,35 @@
+[
+  {
+    "id": "prod-1",
+    "asin": "B09X3P4QGM",
+    "title": "iRobot Roomba j7+",
+    "brand": "iRobot",
+    "price": "549,99 €",
+    "imageUrl": "https://placehold.co/200x200?text=Roomba+j7%2B",
+    "reviewCount": 2847,
+    "rating": 4.4,
+    "status": "done"
+  },
+  {
+    "id": "prod-2",
+    "asin": "B0BW3TT41M",
+    "title": "Roborock S8 Pro Ultra",
+    "brand": "Roborock",
+    "price": "999,99 €",
+    "imageUrl": "https://placehold.co/200x200?text=Roborock+S8",
+    "reviewCount": 1243,
+    "rating": 4.6,
+    "status": "done"
+  },
+  {
+    "id": "prod-3",
+    "asin": "B0C5MKL8VR",
+    "title": "Ecovacs Deebot X2 Omni",
+    "brand": "Ecovacs",
+    "price": "799,00 €",
+    "imageUrl": "https://placehold.co/200x200?text=Deebot+X2",
+    "reviewCount": 876,
+    "rating": 4.3,
+    "status": "done"
+  }
+]
