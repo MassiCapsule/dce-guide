@@ -100,6 +100,12 @@ export function RichEditor({
           <div className="w-px h-5 bg-border mx-1 self-center" />
 
           {toolbarButton(
+            editor.isActive('heading', { level: 1 }),
+            () => editor.chain().focus().toggleHeading({ level: 1 }).run(),
+            <span className="text-xs font-bold">H1</span>,
+            'Titre 1'
+          )}
+          {toolbarButton(
             editor.isActive('heading', { level: 2 }),
             () => editor.chain().focus().toggleHeading({ level: 2 }).run(),
             <span className="text-xs font-bold">H2</span>,
