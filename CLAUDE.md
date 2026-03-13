@@ -192,16 +192,17 @@ Au clic "Créer le guide" :
 
 ---
 
-## Refonte page /guides/[id] (en cours — 2026-03-13)
+## Refonte page /guides/[id] (terminée — 2026-03-13)
 
-Nouvelle architecture à 4 onglets (shadcn/ui Tabs) :
-- **Vue d'ensemble** : infos guide, critères de sélection, progression des étapes
-- **Produits** : liste des produits avec statut (done/pending/error)
-- **Plan** : SeoScoreBar + MetaFields + RichEditor TipTap
-- **Article** : SeoScoreBar + MetaFields + RichEditor TipTap
+Architecture à 4 onglets (shadcn/ui Tabs) — données fictives dans `/fixtures/` :
+- **Vue d'ensemble** : infos guide, critères de sélection (éditables), progression des étapes avec liens vers onglets
+- **Produits** : liste avec statut done/pending/error, image, prix, note, bouton "Lancer la récupération"
+- **Plan** : SeoScoreBar + RichEditor TipTap + boutons "Générer le plan (IA)" et "Valider le plan →"
+- **Article** : SeoScoreBar + section "Éléments SEO" collapsible (fermée par défaut) + RichEditor TipTap + bouton "Générer l'article (IA)"
 
-Données fictives dans `/fixtures/` pour le développement UX (sans appels API réels).
-Plans : `docs/plans/2026-03-13-guide-editor-redesign-design.md` et `docs/plans/2026-03-13-guide-editor-redesign.md`
+**Règles UX importantes :**
+- MetaFields (Slug, Meta title, Meta description, Légende image) → **Article uniquement**, dans un collapsible "Éléments SEO"
+- Barre d'outils RichEditor : Gras, Italique, Souligné | **H1**, H2, H3 | Liste, Liste numérotée | Tableau
 
 ---
 
@@ -211,4 +212,5 @@ Plans : `docs/plans/2026-03-13-guide-editor-redesign-design.md` et `docs/plans/2
 |------|---------|
 | 2026-03-11 | Bouton "Valider" Serpmantics dans guide-form |
 | 2026-03-13 | Suppression section mots-clés manuels — Serpmantics automatique au submit |
-| 2026-03-13 | Refonte /guides/[id] : 4 onglets + TipTap WYSIWYG + SeoScoreBar (en cours) |
+| 2026-03-13 | Refonte /guides/[id] : 4 onglets + TipTap WYSIWYG + SeoScoreBar |
+| 2026-03-13 | MetaFields dans Article uniquement (collapsible "Éléments SEO") + H1 dans toolbar |
