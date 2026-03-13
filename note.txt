@@ -1,0 +1,2 @@
+cd /c/ClaudeCode/fiche-produit-generator
+npm run dev

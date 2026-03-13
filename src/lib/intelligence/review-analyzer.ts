@@ -14,10 +14,18 @@ export interface ReviewAnalysis {
   remarkableQuotes: string[];
 }
 
+export interface AnalysisResult {
+  analysis: ReviewAnalysis;
+  promptTokens: number;
+  completionTokens: number;
+  model: string;
+}
+
 export async function analyzeReviews(
   product: AmazonProductData,
-  reviews: AmazonReview[]
-): Promise<ReviewAnalysis> {
+  reviews: AmazonReview[],
+  model: string = "gpt-4o"
+): Promise<AnalysisResult> {
   const systemPrompt = `Tu es un expert analyste produit. Tu analyses les donnees produit et les avis clients pour en extraire une intelligence produit structuree. Tu reponds toujours en francais et en JSON valide.`;
 
   const userPrompt = `Analyse le produit suivant et ses avis clients. Fournis une analyse structuree en JSON.
@@ -28,7 +36,7 @@ export async function analyzeReviews(
 - Prix : ${product.price}
 - Note : ${product.rating}/5 (${product.reviewCount} avis)
 - Description : ${product.description}
-- Caracteristiques : ${product.features.join(", ")}
+- Caracteristiques : ${(product.features || []).join(", ")}
 
 ## Avis clients (${reviews.length} avis)
 ${reviews
@@ -53,7 +61,7 @@ ${reviews
 }`;
 
   const response = await openai.chat.completions.create({
-    model: "gpt-4o",
+    model,
     messages: [
       { role: "system", content: systemPrompt },
       { role: "user", content: userPrompt },
@@ -69,16 +77,20 @@ ${reviews
 
   const parsed = JSON.parse(content) as ReviewAnalysis;
 
-  // Validate and provide defaults
   return {
-    positioningSummary: parsed.positioningSummary || "",
-    keyFeatures: parsed.keyFeatures || [],
-    detectedUsages: parsed.detectedUsages || [],
-    recurringProblems: parsed.recurringProblems || [],
-    buyerProfiles: parsed.buyerProfiles || [],
-    sentimentScore: typeof parsed.sentimentScore === "number" ? parsed.sentimentScore : 0,
-    strengthPoints: parsed.strengthPoints || [],
-    weaknessPoints: parsed.weaknessPoints || [],
-    remarkableQuotes: parsed.remarkableQuotes || [],
+    analysis: {
+      positioningSummary: parsed.positioningSummary || "",
+      keyFeatures: parsed.keyFeatures || [],
+      detectedUsages: parsed.detectedUsages || [],
+      recurringProblems: parsed.recurringProblems || [],
+      buyerProfiles: parsed.buyerProfiles || [],
+      sentimentScore: typeof parsed.sentimentScore === "number" ? parsed.sentimentScore : 0,
+      strengthPoints: parsed.strengthPoints || [],
+      weaknessPoints: parsed.weaknessPoints || [],
+      remarkableQuotes: parsed.remarkableQuotes || [],
+    },
+    promptTokens: response.usage?.prompt_tokens || 0,
+    completionTokens: response.usage?.completion_tokens || 0,
+    model,
   };
 }

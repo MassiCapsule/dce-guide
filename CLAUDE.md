@@ -1,10 +1,20 @@
 # CLAUDE.md — Mémoire du projet fiche-produit-generator
 
 ## Démarrer le projet
+
+**PowerShell (Windows) :**
+```powershell
+cd C:\ClaudeCode\fiche-produit-generator
+npm run dev
+```
+
+**Git Bash :**
 ```bash
 cd /c/ClaudeCode/fiche-produit-generator
 npm run dev
 ```
+
+→ `http://localhost:3000`
 
 ## Ce que fait ce projet
 Générateur de guides d'achat SEO avec fiches produits Amazon.
@@ -115,6 +125,29 @@ Statut suivi dans `Guide.status` + `Guide.currentStep` avec polling côté clien
 
 ---
 
+## Pages de l'application
+
+| Route | Rôle |
+|-------|------|
+| `/guides` | Liste des guides |
+| `/guides/nouveau` | Formulaire création guide (ASIN, mots-clés, media) |
+| `/guides/[id]` | Détail + progression pipeline |
+| `/medias` | Profils éditoriaux (ton, style, template) |
+| `/produits` | Produits scrappés |
+| `/intelligence` | Analyses IA structurées |
+| `/parametres` | Config runtime : clés API, modèle OpenAI, prompts |
+
+---
+
+## Seed DB
+
+```powershell
+npm run db:seed
+```
+Crée un profil média par défaut "Blog Test Produit".
+
+---
+
 ## Conventions de code
 - Composants UI : shadcn/ui (`src/components/ui/`)
 - Icônes : lucide-react
@@ -129,3 +162,18 @@ Statut suivi dans `Guide.status` + `Guide.currentStep` avec polling côté clien
 - **Affichage clés** → masquées dans `/api/config/keys` (4 derniers caractères)
 - **Appels API externes** → toujours côté serveur (routes Next.js), jamais depuis le client
 - **Nouveaux paramètres runtime** → utiliser AppConfig, pas de nouvelles variables d'env
+
+---
+
+## Git
+
+Pas encore de remote configuré (à faire lors d'une prochaine session).
+
+---
+
+## Historique des features
+
+| Date | Feature |
+|------|---------|
+| 2026-03-11 | Bouton "Valider" Serpmantics dans guide-form (spec : `docs/plans/2026-03-11-serpmantics-validate-button.md`) |
+| 2026-03-13 | Demande : rendre la clé Serpmantics éditable depuis /paramètres (en cours) |

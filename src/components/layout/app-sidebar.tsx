@@ -1,6 +1,6 @@
 "use client";
 
-import { Newspaper, Sparkles, FileText } from "lucide-react";
+import { Newspaper, Sparkles, BookOpen, Package, FileText, Settings } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -16,9 +16,11 @@ import {
 } from "@/components/ui/sidebar";
 
 const navItems = [
+  { title: "Guides d'achat", href: "/guides", icon: BookOpen },
+  { title: "Produits", href: "/intelligence", icon: Package },
+  { title: "Fiches produit", href: "/produits", icon: FileText },
   { title: "Medias", href: "/medias", icon: Newspaper },
-  { title: "Generer une fiche", href: "/generer", icon: Sparkles },
-  { title: "Produits", href: "/produits", icon: FileText },
+  { title: "Parametres", href: "/parametres", icon: Settings },
 ];
 
 export function AppSidebar() {

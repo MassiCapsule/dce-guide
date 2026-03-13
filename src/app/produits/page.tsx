@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { Eye } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { Header } from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
@@ -7,11 +6,8 @@ import { Badge } from "@/components/ui/badge";
 import {
   Card,
   CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
 } from "@/components/ui/card";
-import { DeleteProductButton } from "@/components/products/delete-product-button";
+import { formatCost } from "@/lib/pricing";
 
 export default async function ProduitsPage() {
   const products = await prisma.generatedProductCard.findMany({
@@ -34,7 +30,7 @@ export default async function ProduitsPage() {
                 Aucune fiche produit generee pour le moment.
               </p>
               <Button asChild>
-                <Link href="/generer">Generer une fiche</Link>
+                <Link href="/guides/nouveau">Creer un guide</Link>
               </Button>
             </CardContent>
           </Card>
@@ -45,54 +41,56 @@ export default async function ProduitsPage() {
                 .replace(/<[^>]*>/g, "")
                 .replace(/\s+/g, " ")
                 .trim()
-                .slice(0, 150);
+                .slice(0, 120);
 
               return (
-                <Card key={product.id}>
-                  <CardHeader className="space-y-1">
-                    <div className="flex items-start justify-between">
-                      <CardTitle className="text-base">
-                        {product.asin}
-                      </CardTitle>
-                      <div className="flex items-center gap-1">
-                        <Badge variant="secondary">
-                          {product.wordCount} mots
-                        </Badge>
-                      </div>
-                    </div>
-                    <CardDescription>
-                      <span className="font-medium">{product.keyword}</span>
-                      {" — "}
-                      {product.media.name}
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-sm text-muted-foreground line-clamp-3 mb-4">
-                      {preview}...
-                    </p>
-                    <div className="flex items-center justify-between">
-                      <p className="text-xs text-muted-foreground">
-                        {new Date(product.createdAt).toLocaleDateString(
-                          "fr-FR",
-                          {
-                            day: "numeric",
-                            month: "long",
-                            year: "numeric",
-                          }
+                <Link key={product.id} href={`/produits/${product.id}`} className="block group">
+                  <Card className="h-full transition-shadow group-hover:shadow-md">
+                    <CardContent className="p-4">
+                      <div className="flex gap-3">
+                        {product.intelligence.productImageUrl ? (
+                          <img
+                            src={product.intelligence.productImageUrl}
+                            alt={product.intelligence.productTitle}
+                            className="w-16 h-16 object-contain rounded border bg-white flex-shrink-0"
+                          />
+                        ) : (
+                          <div className="w-16 h-16 rounded border bg-muted flex-shrink-0 flex items-center justify-center text-muted-foreground text-xs">
+                            ?
+                          </div>
                         )}
-                      </p>
-                      <div className="flex items-center gap-1">
-                        <Button variant="outline" size="sm" asChild>
-                          <Link href={`/produits/${product.id}`}>
-                            <Eye className="mr-2 h-3 w-3" />
-                            Voir
-                          </Link>
-                        </Button>
-                        <DeleteProductButton productId={product.id} />
+                        <div className="flex-1 min-w-0">
+                          <h2 className="text-sm font-semibold line-clamp-2 leading-tight">
+                            {product.intelligence.productTitle || product.asin}
+                          </h2>
+                          <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                            <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                              {product.wordCount} mots
+                            </Badge>
+                            <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                              {product.media.name}
+                            </Badge>
+                            {product.generationCost > 0 && (
+                              <Badge variant="outline" className="text-[10px] px-1.5 py-0 font-mono">
+                                {formatCost(product.generationCost)}
+                              </Badge>
+                            )}
+                            <span className="text-[10px] text-muted-foreground">
+                              {new Date(product.createdAt).toLocaleDateString("fr-FR", {
+                                day: "numeric",
+                                month: "short",
+                                year: "numeric",
+                              })}
+                            </span>
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                  </CardContent>
-                </Card>
+                      <p className="text-xs text-muted-foreground line-clamp-2 mt-3">
+                        {preview}...
+                      </p>
+                    </CardContent>
+                  </Card>
+                </Link>
               );
             })}
           </div>

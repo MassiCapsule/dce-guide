@@ -7,6 +7,11 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model AppConfig {
+  key   String @id
+  value String
+}
+
 model Media {
   id                       String   @id @default(cuid())
   name                     String
@@ -20,6 +25,7 @@ model Media {
   updatedAt                DateTime @updatedAt
 
   generatedCards GeneratedProductCard[]
+  guides         Guide[]
 }
 
 model ProductIntelligence {
@@ -43,26 +49,96 @@ model ProductIntelligence {
   rawReviewsJson     String   @default("[]")
   reviewCount        Int      @default(0)
   analyzed           Boolean  @default(false)
+  analysisPromptTokens     Int    @default(0)
+  analysisCompletionTokens Int    @default(0)
+  analysisModelUsed        String @default("gpt-4o")
+  analysisCost             Float  @default(0)
+  scrapingCost             Float  @default(0)
   createdAt          DateTime @default(now())
 
   generatedCards GeneratedProductCard[]
+  guideProducts  GuideProduct[]
 
   @@unique([asin, marketplace])
 }
 
 model GeneratedProductCard {
-  id             String   @id @default(cuid())
-  asin           String
-  keyword        String
-  wordCount      Int
-  contentHtml    String
-  promptUsed     String
-  modelUsed      String   @default("gpt-4o")
-  tokensUsed     Int      @default(0)
-  createdAt      DateTime @default(now())
+  id               String   @id @default(cuid())
+  asin             String
+  keyword          String
+  wordCount        Int
+  contentHtml      String
+  promptUsed       String
+  modelUsed        String   @default("gpt-4o")
+  tokensUsed       Int      @default(0)
+  promptTokens     Int      @default(0)
+  completionTokens Int      @default(0)
+  generationCost   Float    @default(0)
+  createdAt        DateTime @default(now())
 
   media          Media              @relation(fields: [mediaId], references: [id])
   mediaId        String
   intelligence   ProductIntelligence @relation(fields: [intelligenceId], references: [id])
   intelligenceId String
+
+  guideProduct GuideProduct?
+}
+
+// --- Guides d'Achat ---
+
+model Guide {
+  id           String @id @default(cuid())
+  title        String
+  status       String @default("draft") // draft|scraping|analyzing|distributing|generating|generating-guide|complete|error
+  errorMessage String @default("")
+  currentStep  Int    @default(0) // Index du produit en cours (progress)
+
+  mediaId String
+  media   Media  @relation(fields: [mediaId], references: [id])
+
+  guideHtml             String @default("")
+  guideWordCount        Int    @default(0)
+  guidePromptUsed       String @default("")
+  guideModelUsed        String @default("gpt-4o")
+  guidePromptTokens     Int    @default(0)
+  guideCompletionTokens Int    @default(0)
+  guideGenerationCost   Float  @default(0)
+  totalCost             Float  @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  products GuideProduct[]
+  keywords GuideKeyword[]
+}
+
+model GuideProduct {
+  id       String @id @default(cuid())
+  position Int // Ordre dans le guide (1-based)
+
+  guideId String
+  guide   Guide @relation(fields: [guideId], references: [id], onDelete: Cascade)
+
+  intelligenceId String
+  intelligence   ProductIntelligence @relation(fields: [intelligenceId], references: [id])
+
+  generatedCardId String?              @unique
+  generatedCard   GeneratedProductCard? @relation(fields: [generatedCardId], references: [id])
+
+  keywordAllocation String @default("[]") // JSON: [{ keyword, targetCount }]
+
+  @@unique([guideId, intelligenceId])
+  @@unique([guideId, position])
+}
+
+model GuideKeyword {
+  id             String @id @default(cuid())
+  keyword        String
+  minOccurrences Int
+  maxOccurrences Int
+
+  guideId String
+  guide   Guide @relation(fields: [guideId], references: [id], onDelete: Cascade)
+
+  @@unique([guideId, keyword])
 }

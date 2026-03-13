@@ -1,10 +1,16 @@
 import type { Media, ProductIntelligence } from "@prisma/client";
 
+export interface KeywordAllocationItem {
+  keyword: string;
+  targetCount: number;
+}
+
 export function buildGenerationPrompt(
   media: Media,
   intelligence: ProductIntelligence,
   keyword: string,
-  wordCount: number
+  wordCount: number,
+  keywordAllocation?: KeywordAllocationItem[]
 ): string {
   // Parse JSON string fields from media
   let doRules: string[] = [];
@@ -106,9 +112,16 @@ ${remarkableQuotes.map((q) => `> "${q}"`).join("\n")}`);
   }
 
   // 6. SEO keyword instruction
-  sections.push(`## Mot-cle SEO principal
+  if (keywordAllocation && keywordAllocation.length > 0) {
+    sections.push(`## Mots-cles SEO a integrer
+Integre les mots-cles suivants dans le texte avec le nombre d'occurrences cible :
+${keywordAllocation.map((k) => `- "${k.keyword}" : environ ${k.targetCount} occurrence${k.targetCount > 1 ? "s" : ""}`).join("\n")}
+Repartis-les naturellement dans les titres et le corps du texte. Ne fais pas de bourrage de mots-cles.`);
+  } else {
+    sections.push(`## Mot-cle SEO principal
 Le mot-cle principal a cibler est : **${keyword}**
 Integre ce mot-cle naturellement dans le titre H1, au moins un H2, l'introduction, et plusieurs fois dans le corps du texte. Ne fais pas de bourrage de mots-cles.`);
+  }
 
   // 7. Structure template
   sections.push(`## Structure de la fiche produit
@@ -125,6 +138,7 @@ La fiche produit doit faire environ **${wordCount} mots**. Ne fais pas moins de 
 Genere uniquement du HTML semantique propre (h1, h2, h3, p, ul, li, strong, em, blockquote, etc.).
 Ne genere PAS de balises html, head, body, doctype ni de code markdown.
 Ne genere PAS de blocs de code (\`\`\`).
+Ne genere PAS de balises img ou d'images.
 Commence directement par le contenu HTML.`);
 
   return sections.join("\n\n");

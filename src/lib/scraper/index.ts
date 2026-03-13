@@ -4,23 +4,36 @@ import { scrapeAmazonReviews } from "./amazon-reviews";
 
 const MARKETPLACE = "amazon.fr";
 
-export async function scrapeAndStore(asin: string, forceRefresh = false) {
+export async function scrapeAndStore(asin: string, forceRefresh = false, maxAgeDays?: number) {
   // Check for existing record
-  if (!forceRefresh) {
-    const existing = await prisma.productIntelligence.findUnique({
-      where: { asin_marketplace: { asin, marketplace: MARKETPLACE } },
-    });
+  const existing = await prisma.productIntelligence.findUnique({
+    where: { asin_marketplace: { asin, marketplace: MARKETPLACE } },
+  });
 
-    if (existing) {
+  // A placeholder has no productTitle — always scrape it
+  const isPlaceholder = existing && !existing.productTitle;
+
+  if (existing && !forceRefresh && !isPlaceholder) {
+    // If maxAgeDays is set, check freshness
+    if (maxAgeDays !== undefined) {
+      const ageMs = Date.now() - existing.createdAt.getTime();
+      const ageDays = ageMs / (1000 * 60 * 60 * 24);
+      if (ageDays <= maxAgeDays) {
+        return existing;
+      }
+      // Stale → continue to re-scrape
+    } else {
       return existing;
     }
   }
 
   // Scrape product data and reviews in parallel
-  const [productData, reviews] = await Promise.all([
+  const [productResult, reviewsResult] = await Promise.all([
     scrapeAmazonProduct(asin),
     scrapeAmazonReviews(asin),
   ]);
+
+  const scrapingCost = productResult.costUsd + reviewsResult.costUsd;
 
   // Upsert the ProductIntelligence record
   const intelligence = await prisma.productIntelligence.upsert({
@@ -28,24 +41,25 @@ export async function scrapeAndStore(asin: string, forceRefresh = false) {
     create: {
       asin,
       marketplace: MARKETPLACE,
-      productTitle: productData.title,
-      productBrand: productData.brand,
-      productPrice: productData.price,
-      productImageUrl: productData.mainImageUrl,
-      rawProductJson: JSON.stringify(productData),
-      rawReviewsJson: JSON.stringify(reviews),
-      reviewCount: reviews.length,
+      productTitle: productResult.data.title,
+      productBrand: productResult.data.brand,
+      productPrice: productResult.data.price,
+      productImageUrl: productResult.data.mainImageUrl,
+      rawProductJson: JSON.stringify(productResult.rawItem),
+      rawReviewsJson: JSON.stringify(reviewsResult.rawItems),
+      reviewCount: reviewsResult.reviews.length,
+      scrapingCost,
     },
     update: {
-      productTitle: productData.title,
-      productBrand: productData.brand,
-      productPrice: productData.price,
-      productImageUrl: productData.mainImageUrl,
-      rawProductJson: JSON.stringify(productData),
-      rawReviewsJson: JSON.stringify(reviews),
-      reviewCount: reviews.length,
+      productTitle: productResult.data.title,
+      productBrand: productResult.data.brand,
+      productPrice: productResult.data.price,
+      productImageUrl: productResult.data.mainImageUrl,
+      rawProductJson: JSON.stringify(productResult.rawItem),
+      rawReviewsJson: JSON.stringify(reviewsResult.rawItems),
+      reviewCount: reviewsResult.reviews.length,
+      scrapingCost,
       analyzed: false,
-      // Reset analysis fields on refresh
       positioningSummary: "",
       keyFeatures: "[]",
       detectedUsages: "[]",

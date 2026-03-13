@@ -3,6 +3,8 @@ import { prisma } from "@/lib/prisma";
 import { buildGenerationPrompt } from "@/lib/prompt-builder";
 import { generateStream } from "@/lib/generator";
 import { cleanHtml, countWords } from "@/lib/generator/html-formatter";
+import { getConfigModel } from "@/lib/config";
+import { calculateCost } from "@/lib/pricing";
 
 export async function POST(req: Request) {
   try {
@@ -43,8 +45,9 @@ export async function POST(req: Request) {
 
     const targetWordCount = wordCount || media.defaultProductWordCount;
     const prompt = buildGenerationPrompt(media, intelligence, keyword, targetWordCount);
+    const model = await getConfigModel();
 
-    const openaiStream = await generateStream(prompt);
+    const { stream: openaiStream, getUsage } = await generateStream(prompt, model);
 
     let fullContent = "";
 
@@ -62,7 +65,11 @@ export async function POST(req: Request) {
           }
         }
 
-        // Save the generated card to DB after stream completes
+        const usage = getUsage();
+        const promptTokens = usage?.promptTokens || 0;
+        const completionTokens = usage?.completionTokens || 0;
+        const cost = calculateCost(model, promptTokens, completionTokens);
+
         const cleaned = cleanHtml(fullContent);
         const actualWordCount = countWords(cleaned);
 
@@ -73,7 +80,11 @@ export async function POST(req: Request) {
             wordCount: actualWordCount,
             contentHtml: cleaned,
             promptUsed: prompt,
-            modelUsed: "gpt-4o",
+            modelUsed: model,
+            tokensUsed: promptTokens + completionTokens,
+            promptTokens,
+            completionTokens,
+            generationCost: cost,
             mediaId: media.id,
             intelligenceId: intelligence.id,
           },

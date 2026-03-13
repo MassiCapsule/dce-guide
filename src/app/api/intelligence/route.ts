@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { analyzeReviews } from "@/lib/intelligence/review-analyzer";
+import { mapRawProduct } from "@/lib/scraper/amazon-product";
+import { mapRawReviews } from "@/lib/scraper/amazon-reviews";
+import { getConfigModel } from "@/lib/config";
+import { calculateCost } from "@/lib/pricing";
 
 export async function POST(req: Request) {
   try {
@@ -24,24 +28,32 @@ export async function POST(req: Request) {
       );
     }
 
-    const rawProduct = JSON.parse(intelligence.rawProductJson);
-    const rawReviews = JSON.parse(intelligence.rawReviewsJson);
+    const rawProductItem = JSON.parse(intelligence.rawProductJson);
+    const rawReviewItems = JSON.parse(intelligence.rawReviewsJson);
+    const product = mapRawProduct(rawProductItem);
+    const reviews = mapRawReviews(rawReviewItems);
 
-    const analysis = await analyzeReviews(rawProduct, rawReviews);
+    const model = await getConfigModel();
+    const result = await analyzeReviews(product, reviews, model);
+    const cost = calculateCost(model, result.promptTokens, result.completionTokens);
 
     const updated = await prisma.productIntelligence.update({
       where: { id: intelligenceId },
       data: {
-        positioningSummary: analysis.positioningSummary,
-        keyFeatures: JSON.stringify(analysis.keyFeatures),
-        detectedUsages: JSON.stringify(analysis.detectedUsages),
-        recurringProblems: JSON.stringify(analysis.recurringProblems),
-        buyerProfiles: JSON.stringify(analysis.buyerProfiles),
-        sentimentScore: analysis.sentimentScore,
-        strengthPoints: JSON.stringify(analysis.strengthPoints),
-        weaknessPoints: JSON.stringify(analysis.weaknessPoints),
-        remarkableQuotes: JSON.stringify(analysis.remarkableQuotes),
+        positioningSummary: result.analysis.positioningSummary,
+        keyFeatures: JSON.stringify(result.analysis.keyFeatures),
+        detectedUsages: JSON.stringify(result.analysis.detectedUsages),
+        recurringProblems: JSON.stringify(result.analysis.recurringProblems),
+        buyerProfiles: JSON.stringify(result.analysis.buyerProfiles),
+        sentimentScore: result.analysis.sentimentScore,
+        strengthPoints: JSON.stringify(result.analysis.strengthPoints),
+        weaknessPoints: JSON.stringify(result.analysis.weaknessPoints),
+        remarkableQuotes: JSON.stringify(result.analysis.remarkableQuotes),
         analyzed: true,
+        analysisModelUsed: model,
+        analysisPromptTokens: result.promptTokens,
+        analysisCompletionTokens: result.completionTokens,
+        analysisCost: cost,
       },
     });
 
