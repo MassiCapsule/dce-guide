@@ -28,7 +28,8 @@ export function MetaFields({
           <Input
             value={slug}
             onChange={(e) => onChange("slug", e.target.value)}
-            className="font-mono"
+            placeholder="meilleurs-robots-aspirateurs-2025"
+            className="mt-1 text-sm font-mono"
           />
         </div>
         <div>
@@ -36,6 +37,8 @@ export function MetaFields({
           <Input
             value={metaTitle}
             onChange={(e) => onChange("metaTitle", e.target.value)}
+            placeholder="Titre SEO (60 car. max)"
+            className="mt-1 text-sm"
           />
           <p className="text-xs text-muted-foreground mt-0.5">
             {metaTitle.length} / 60
@@ -49,7 +52,9 @@ export function MetaFields({
         <Textarea
           value={metaDescription}
           onChange={(e) => onChange("metaDescription", e.target.value)}
+          placeholder="Description SEO (155 car. max)"
           rows={2}
+          className="mt-1 text-sm resize-none"
         />
         <p className="text-xs text-muted-foreground mt-0.5">
           {metaDescription.length} / 155
@@ -62,6 +67,8 @@ export function MetaFields({
         <Input
           value={imageCaption}
           onChange={(e) => onChange("imageCaption", e.target.value)}
+          placeholder="Ex: Robot aspirateur iRobot Roomba j7+ sur parquet"
+          className="mt-1 text-sm"
         />
       </div>
     </div>
