@@ -40,9 +40,9 @@ export async function POST(req: NextRequest) {
       })
       .join("\n");
 
-    // Build keywords list (top 30)
-    const motsCles = guide.keywords
-      .slice(0, 30)
+    // Build keywords list — triés par importance (minOccurrences décroissant)
+    const motsCles = [...guide.keywords]
+      .sort((a, b) => b.minOccurrences - a.minOccurrences)
       .map((k) => `${k.keyword} (${k.minOccurrences}-${k.maxOccurrences}x)`)
       .join(", ");
 

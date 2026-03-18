@@ -481,3 +481,6 @@ Champs **retirés de l'UI média** (restent en DB) : `productStructureTemplate`
 | 2026-03-18 | Placeholder `{forbiddenWords}` supporté dans le prompt humaniser (`build-humanize-prompt`) |
 | 2026-03-18 | Champ `modelPlan` ajouté au modèle Media (migration) — modèle IA spécifique au média pour la génération du plan |
 | 2026-03-18 | Plan-generator : priorité `media.modelPlan` > config globale `model_plan` |
+| 2026-03-18 | Playground : toggle "Badges / Texte brut" pour voir le prompt avec ou sans labels de variables (onglets Fiche produit et Plan) |
+| 2026-03-18 | `#MotsCles` inclut tous les mots-clés Serpmantics (suppression du `.slice(0, 30)`) — Playground et pipeline |
+| 2026-03-18 | `#MotsCles` triés par importance (`minOccurrences` décroissant) — Playground et pipeline |

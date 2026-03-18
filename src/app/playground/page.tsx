@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Loader2, Eye, Code, FlaskConical, FileText } from "lucide-react";
+import { Loader2, Eye, Code, FlaskConical, FileText, Tags, Type } from "lucide-react";
 import { Header } from "@/components/layout/header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -174,6 +174,7 @@ function TabFicheProduit({ medias }: { medias: MediaOption[] }) {
   const [generatedHtmlV2, setGeneratedHtmlV2] = useState("");
   const [tokenInfoV2, setTokenInfoV2] = useState<{ promptTokens: number; completionTokens: number } | null>(null);
   const [loadingHumanize, setLoadingHumanize] = useState(false);
+  const [showBadges, setShowBadges] = useState(true);
 
   // Init media
   useEffect(() => {
@@ -370,14 +371,31 @@ function TabFicheProduit({ medias }: { medias: MediaOption[] }) {
           <CardHeader>
             <div className="flex items-center justify-between">
               <CardTitle>Prompt</CardTitle>
-              <Button onClick={handleGenerate} disabled={loadingGenerate}>
-                {loadingGenerate && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                Générer
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowBadges(!showBadges)}
+                  className="flex items-center gap-1"
+                >
+                  {showBadges ? <Type className="w-3 h-3" /> : <Tags className="w-3 h-3" />}
+                  {showBadges ? "Texte brut" : "Badges"}
+                </Button>
+                <Button onClick={handleGenerate} disabled={loadingGenerate}>
+                  {loadingGenerate && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                  Générer
+                </Button>
+              </div>
             </div>
           </CardHeader>
           <CardContent>
-            <AnnotatedPromptDisplay segments={segments} />
+            {showBadges ? (
+              <AnnotatedPromptDisplay segments={segments} />
+            ) : (
+              <pre className="whitespace-pre-wrap text-sm leading-relaxed font-mono bg-muted/30 rounded-lg p-4 max-h-[600px] overflow-y-auto">
+                {fullPrompt}
+              </pre>
+            )}
             <p className="text-xs text-muted-foreground mt-2">
               Pour modifier le template, rendez-vous dans <a href="/parametres" className="underline hover:text-foreground">Paramètres &rarr; Prompts</a>.
             </p>
@@ -432,6 +450,7 @@ function TabPlan() {
   const [loadingPrompt, setLoadingPrompt] = useState(false);
   const [loadingGenerate, setLoadingGenerate] = useState(false);
   const [error, setError] = useState("");
+  const [showBadges, setShowBadges] = useState(true);
 
   const handleLoadPrompt = async () => {
     if (!guideId.trim()) {
@@ -542,14 +561,31 @@ function TabPlan() {
           <CardHeader>
             <div className="flex items-center justify-between">
               <CardTitle>Prompt Plan</CardTitle>
-              <Button onClick={handleGenerate} disabled={loadingGenerate}>
-                {loadingGenerate && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                Générer
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowBadges(!showBadges)}
+                  className="flex items-center gap-1"
+                >
+                  {showBadges ? <Type className="w-3 h-3" /> : <Tags className="w-3 h-3" />}
+                  {showBadges ? "Texte brut" : "Badges"}
+                </Button>
+                <Button onClick={handleGenerate} disabled={loadingGenerate}>
+                  {loadingGenerate && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                  Générer
+                </Button>
+              </div>
             </div>
           </CardHeader>
           <CardContent>
-            <AnnotatedPromptDisplay segments={segments} />
+            {showBadges ? (
+              <AnnotatedPromptDisplay segments={segments} />
+            ) : (
+              <pre className="whitespace-pre-wrap text-sm leading-relaxed font-mono bg-muted/30 rounded-lg p-4 max-h-[600px] overflow-y-auto">
+                {fullPrompt}
+              </pre>
+            )}
             <p className="text-xs text-muted-foreground mt-2">
               Pour modifier le template, rendez-vous dans <a href="/medias" className="underline hover:text-foreground">Médias &rarr; {mediaName || "votre média"}</a>.
             </p>

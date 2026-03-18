@@ -146,9 +146,9 @@ export async function generatePlan(guideId: string): Promise<void> {
       })
       .join("\n");
 
-    // Build keywords list
-    const motsCles = guide.keywords
-      .slice(0, 30) // Top 30 suffisent pour le plan
+    // Build keywords list — triés par importance (minOccurrences décroissant)
+    const motsCles = [...guide.keywords]
+      .sort((a, b) => b.minOccurrences - a.minOccurrences)
       .map((k) => `${k.keyword} (${k.minOccurrences}-${k.maxOccurrences}x)`)
       .join(", ");
 
