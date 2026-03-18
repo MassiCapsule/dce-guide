@@ -48,6 +48,7 @@ Générateur de guides d'achat SEO avec fiches produits Amazon.
 |---------|------|
 | `src/components/guides/guide-form.tsx` | Formulaire création guides (keyword + media uniquement) — sans critères, sans ASINs |
 | `src/app/parametres/page.tsx` | Page config : 2 onglets (Prompts, Clés API). Prompts avec modèle IA par étape (Critères Perplexity, Analyse, Generation, Plan) |
+| `src/app/playground/page.tsx` | Playground : test prompt fiche produit avec badges variables, édition, génération |
 | `src/components/editor/rich-editor.tsx` | Éditeur WYSIWYG TipTap v3 (H1/H2/H3, gras, listes, tableau) |
 | `src/components/editor/seo-score-bar.tsx` | Barre score SEO Serpmantics + pills mots-clés |
 | `src/components/editor/meta-fields.tsx` | Champs méta : slug, meta title, meta desc, légende image |
@@ -80,6 +81,8 @@ Générateur de guides d'achat SEO avec fiches produits Amazon.
 | `/api/config/keys` | GET | Afficher les clés API masquées |
 | `/api/config/prompts` | GET | Prompts par défaut (analysis, generation, criteres, plan) |
 | `/api/serpmantics/guide` | POST | Créer guide Serpmantics (avec `group: DCE-{NomMedia}-API`) + polling + extraction mots-clés triés par importance + wordCount + serpanticsGuideId |
+| `/api/playground/build-prompt` | POST | Construit le prompt de génération annoté (segments avec badges variables) depuis AppConfig |
+| `/api/playground/generate` | POST | Envoie un prompt au modèle IA choisi, retourne le HTML généré |
 
 ### Lib / Services
 | Fichier | Rôle |
@@ -94,6 +97,8 @@ Générateur de guides d'achat SEO avec fiches produits Amazon.
 | `src/lib/guide/scrape-step.ts` | Scraping Apify + analyse IA (modèle `model_analysis`) — status: scraping → analyzing → products-ready |
 | `src/lib/guide/plan-generator.ts` | Génération du plan IA (modèle `model_plan`) — status: generating-plan → plan-ready |
 | `src/lib/guide/article-generator.ts` | Distribution mots-clés + génération fiches + assemblage — status: distributing → generating → complete |
+| `src/lib/prompt-builder/annotated.ts` | Construit un prompt annoté depuis un template (placeholders → segments avec badges) pour le Playground |
+| `src/lib/intelligence/review-analyzer.ts` | Analyse IA des avis — charge le prompt depuis AppConfig (`prompt_analysis`), placeholders : `{title}`, `{brand}`, `{price}`, `{rating}`, `{reviewCount}`, `{description}`, `{features}`, `{count}`, `{reviews}` |
 
 ---
 
@@ -105,7 +110,7 @@ Générateur de guides d'achat SEO avec fiches produits Amazon.
 - **Guide** : guide d'achat avec statut, HTML généré, coûts, wordCountMin/Max, planHtml, guideHtml, seoScore, seoKeywords
 - **GuideProduct** : produits d'un guide avec allocation mots-clés
 - **GuideKeyword** : mots-clés SEO d'un guide (min/max occurrences)
-- **ProductIntelligence** : données scrappées + analyse IA par ASIN
+- **ProductIntelligence** : données scrappées + analyse IA par ASIN (inclut `shortTitle` — titre court généré par l'IA)
 - **GeneratedProductCard** : fiche HTML générée par produit
 
 ### Champs Guide importants
@@ -133,8 +138,8 @@ Générateur de guides d'achat SEO avec fiches produits Amazon.
 | `model_analysis` | Modèle IA pour l'analyse des avis |
 | `model_plan` | Modèle IA pour la génération du plan |
 | `openai_model` | (legacy) Fallback si les modèles par étape ne sont pas configurés |
-| `prompt_generation` | Prompt pour générer les fiches produits |
-| `prompt_analysis` | Prompt pour analyser les avis |
+| `prompt_generation` | Prompt template pour générer les fiches produits — placeholders : `{media.name}`, `{media.toneDescription}`, `{media.writingStyle}`, `{doRules}`, `{dontRules}`, `{intelligence.productTitle}`, `{intelligence.shortTitle}`, `{intelligence.productBrand}`, `{intelligence.productPrice}`, `{intelligence.asin}`, `{intelligence.positioningSummary}`, `{intelligence.keyFeatures}`, `{intelligence.detectedUsages}`, `{intelligence.buyerProfiles}`, `{intelligence.strengthPoints}`, `{intelligence.weaknessPoints}`, `{intelligence.recurringProblems}`, `{intelligence.remarkableQuotes}`, `{keyword}`, `{wordCount}`, `{planSection}` |
+| `prompt_analysis` | Prompt template pour analyser les avis — placeholders : `{title}`, `{brand}`, `{price}`, `{rating}`, `{reviewCount}`, `{description}`, `{features}`, `{count}`, `{reviews}`. Sections `**System**` et `**User**` détectées automatiquement |
 | `prompt_criteres` | Prompt Perplexity pour générer les critères (placeholder `#MotClesprincipal`) |
 | `prompt_plan` | Prompt génération du plan global — placeholders : `#NomMedia`, `#MotClePrincipal`, `#NombreMots`, `#Criteres`, `#ResumeProduits`, `#MotsCles` |
 | `openai_api_key` | Clé API OpenAI (saisie depuis /parametres > Clés API) |
@@ -255,6 +260,7 @@ Au submit du formulaire de création :
 | `/medias` | Profils éditoriaux (ton, style, template) |
 | `/produits` | Produits scrappés |
 | `/intelligence` | Analyses IA structurées |
+| `/playground` | Playground : tester le prompt de génération fiche produit (charger, visualiser avec badges, éditer, générer) |
 | `/parametres` | Config runtime : 2 onglets — Prompts (modèle IA par étape + prompts éditables) et Clés API (OpenAI, Anthropic, Apify, Serpmantics) |
 
 ---
@@ -341,16 +347,28 @@ La réponse IA est nettoyée des balises markdown (` ```html ` / ` ``` `) avant 
 
 ## Prompt de génération de fiche produit — architecture
 
-`src/lib/prompt-builder/index.ts` — construit le prompt pour chaque fiche produit :
-- Contexte rédacteur + ton + style du média
-- Règles "DO" du média (les règles "DON'T" ont été retirées)
-- Données produit (titre, marque, prix, ASIN, positionnement, usages, avis)
-- Mots-clés SEO à intégrer (allocation par produit)
-- **Section du plan éditorial** correspondant à ce produit (extraite du `planHtml` par matching H2)
-- Objectif de nombre de mots
-- Format de sortie HTML
+Le prompt est un **template éditable** dans Paramètres > Generation (clé `prompt_generation` en AppConfig).
+Les placeholders `{variable}` sont remplacés par les vraies données au moment de la génération.
+
+`src/lib/prompt-builder/index.ts` — construit le prompt codé en dur (utilisé par le pipeline article).
+`src/lib/prompt-builder/annotated.ts` — construit le prompt depuis le template AppConfig avec annotations (utilisé par le Playground).
+
+**Placeholders disponibles :** `{media.name}`, `{media.toneDescription}`, `{media.writingStyle}`, `{doRules}`, `{dontRules}`, `{intelligence.productTitle}`, `{intelligence.shortTitle}`, `{intelligence.productBrand}`, `{intelligence.productPrice}`, `{intelligence.asin}`, `{intelligence.positioningSummary}`, `{intelligence.keyFeatures}`, `{intelligence.detectedUsages}`, `{intelligence.buyerProfiles}`, `{intelligence.strengthPoints}`, `{intelligence.weaknessPoints}`, `{intelligence.recurringProblems}`, `{intelligence.remarkableQuotes}`, `{keyword}`, `{wordCount}`, `{planSection}`, `{media.productStructureTemplate}`
 
 La section plan est extraite dans `article-generator.ts` via `extractPlanSection(planHtml, productTitle)` — compare les 20 premiers caractères du titre produit (normalisés) avec les H2 du plan.
+
+---
+
+## Prompt d'analyse des avis — architecture
+
+Le prompt est un **template éditable** dans Paramètres > Analyse (clé `prompt_analysis` en AppConfig).
+`src/lib/intelligence/review-analyzer.ts` charge le prompt depuis AppConfig, sinon utilise le prompt par défaut.
+
+**Format du template :** sections `**System** :` et `**User** :` détectées automatiquement. Si absentes, tout le texte est utilisé comme user prompt avec un system prompt par défaut.
+
+**Placeholders disponibles :** `{title}`, `{brand}`, `{price}`, `{rating}`, `{reviewCount}`, `{description}`, `{features}`, `{count}`, `{reviews}`
+
+**Champ `shortTitle`** : l'IA génère un titre court du produit (marque + gamme + caractéristique clé) sauvegardé sur ProductIntelligence.
 
 ---
 
@@ -366,7 +384,7 @@ La section plan est extraite dans `article-generator.ts` via `extractPlanSection
 | `defaultProductWordCount` | Nombre de mots par fiche produit |
 | `promptPlan` | Prompt plan spécifique (prioritaire sur AppConfig global) |
 
-Champs **retirés de l'UI** (restent en DB, non utilisés) : `dontRules`, `productStructureTemplate`
+Champs **retirés de l'UI média** (restent en DB) : `dontRules` (utilisé via placeholder `{dontRules}` dans le prompt generation), `productStructureTemplate`
 
 ---
 
@@ -431,3 +449,8 @@ Champs **retirés de l'UI** (restent en DB, non utilisés) : `dontRules`, `produ
 | 2026-03-18 | Route `/api/guides/[id]/score` sauvegarde le score en DB après chaque calcul |
 | 2026-03-18 | Score SEO rechargé depuis DB au chargement de la page (plus besoin de recalculer) |
 | 2026-03-18 | Fix boucle infinie Recalculer : guard `scoreLoading` + catch réseau + sync props useEffect |
+| 2026-03-18 | Page Playground `/playground` : test prompt fiche produit avec badges variables, édition libre, génération IA |
+| 2026-03-18 | Prompt génération (`prompt_generation`) lu depuis AppConfig — template avec placeholders `{variable}` |
+| 2026-03-18 | Prompt analyse (`prompt_analysis`) lu depuis AppConfig — template avec placeholders `{title}`, `{brand}`, etc. |
+| 2026-03-18 | Champ `shortTitle` ajouté à ProductIntelligence — titre court généré par l'IA lors de l'analyse |
+| 2026-03-18 | Navigation : lien "Playground" ajouté dans la sidebar |

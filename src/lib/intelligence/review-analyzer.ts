@@ -1,8 +1,10 @@
 import { chatCompletion } from "@/lib/ai-client";
+import { prisma } from "@/lib/prisma";
 import type { AmazonProductData } from "@/lib/scraper/amazon-product";
 import type { AmazonReview } from "@/lib/scraper/amazon-reviews";
 
 export interface ReviewAnalysis {
+  shortTitle: string;
   positioningSummary: string;
   keyFeatures: string[];
   detectedUsages: string[];
@@ -21,34 +23,24 @@ export interface AnalysisResult {
   model: string;
 }
 
-export async function analyzeReviews(
-  product: AmazonProductData,
-  reviews: AmazonReview[],
-  model: string = "gpt-4o"
-): Promise<AnalysisResult> {
-  const systemPrompt = `Tu es un expert analyste produit. Tu analyses les donnees produit et les avis clients pour en extraire une intelligence produit structuree. Tu reponds toujours en francais et en JSON valide.`;
+const DEFAULT_SYSTEM_PROMPT = `Tu es un expert analyste produit. Tu analyses les donnees produit et les avis clients pour en extraire une intelligence produit structuree. Tu reponds toujours en francais et en JSON valide.`;
 
-  const userPrompt = `Analyse le produit suivant et ses avis clients. Fournis une analyse structuree en JSON.
+const DEFAULT_USER_PROMPT = `Analyse le produit suivant et ses avis clients. Fournis une analyse structuree en JSON.
 
 ## Produit
-- Titre : ${product.title}
-- Marque : ${product.brand}
-- Prix : ${product.price}
-- Note : ${product.rating}/5 (${product.reviewCount} avis)
-- Description : ${product.description}
-- Caracteristiques : ${(product.features || []).join(", ")}
+- Titre : {title}
+- Marque : {brand}
+- Prix : {price}
+- Note : {rating}/5 ({reviewCount} avis)
+- Description : {description}
+- Caracteristiques : {features}
 
-## Avis clients (${reviews.length} avis)
-${reviews
-  .slice(0, 80)
-  .map(
-    (r, i) =>
-      `[Avis ${i + 1}] Note: ${r.rating}/5 | Verifie: ${r.verified ? "Oui" : "Non"}\nTitre: ${r.title}\n${r.text}`
-  )
-  .join("\n\n")}
+## Avis clients ({count} avis)
+{reviews}
 
 ## Format de reponse attendu (JSON)
 {
+  "shortTitle": "Titre court du produit (marque + gamme + caracteristique cle, ex: Bosch OptiMUM 1600 W)",
   "positioningSummary": "Resume du positionnement produit en 2-3 phrases",
   "keyFeatures": ["caracteristique cle 1", "caracteristique cle 2", ...],
   "detectedUsages": ["usage detecte 1", "usage detecte 2", ...],
@@ -59,6 +51,71 @@ ${reviews
   "weaknessPoints": ["point faible 1", ... (5 a 8 elements)],
   "remarkableQuotes": ["citation remarquable 1", ... (6 a 12 elements)]
 }`;
+
+function buildReviewsText(reviews: AmazonReview[]): string {
+  return reviews
+    .slice(0, 80)
+    .map(
+      (r, i) =>
+        `[Avis ${i + 1}] Note: ${r.rating}/5 | Verifie: ${r.verified ? "Oui" : "Non"}\nTitre: ${r.title}\n${r.text}`
+    )
+    .join("\n\n");
+}
+
+function replacePromptPlaceholders(
+  template: string,
+  product: AmazonProductData,
+  reviews: AmazonReview[]
+): string {
+  return template
+    .replace(/\{title\}/g, product.title)
+    .replace(/\{brand\}/g, product.brand)
+    .replace(/\{price\}/g, product.price)
+    .replace(/\{rating\}/g, String(product.rating))
+    .replace(/\{reviewCount\}/g, String(product.reviewCount))
+    .replace(/\{description\}/g, product.description)
+    .replace(/\{features\}/g, (product.features || []).join(", "))
+    .replace(/\{count\}/g, String(reviews.length))
+    .replace(/\{reviews\}/g, buildReviewsText(reviews));
+}
+
+export async function analyzeReviews(
+  product: AmazonProductData,
+  reviews: AmazonReview[],
+  model: string = "gpt-4o"
+): Promise<AnalysisResult> {
+  // Load prompt from AppConfig (DB), fallback to default
+  const promptConfig = await prisma.appConfig.findUnique({
+    where: { key: "prompt_analysis" },
+  });
+
+  const rawPrompt = promptConfig?.value || `${DEFAULT_SYSTEM_PROMPT}\n\n${DEFAULT_USER_PROMPT}`;
+
+  // Split on **User** : marker if present, otherwise use full text as user prompt
+  let systemPrompt: string;
+  let userPromptTemplate: string;
+
+  const userMarker = rawPrompt.indexOf("**User**");
+  if (userMarker !== -1) {
+    // Find the "**System**" section
+    const systemMarker = rawPrompt.indexOf("**System**");
+    if (systemMarker !== -1) {
+      // Extract system content between **System** : and **User**
+      const systemStart = rawPrompt.indexOf(":", systemMarker) + 1;
+      systemPrompt = rawPrompt.slice(systemStart, userMarker).trim();
+    } else {
+      systemPrompt = DEFAULT_SYSTEM_PROMPT;
+    }
+    // Extract user content after **User** :
+    const userStart = rawPrompt.indexOf(":", userMarker) + 1;
+    userPromptTemplate = rawPrompt.slice(userStart).trim();
+  } else {
+    // No markers — use whole thing as user prompt with default system
+    systemPrompt = DEFAULT_SYSTEM_PROMPT;
+    userPromptTemplate = rawPrompt;
+  }
+
+  const userPrompt = replacePromptPlaceholders(userPromptTemplate, product, reviews);
 
   const response = await chatCompletion(model, [
     { role: "system", content: systemPrompt },
@@ -73,6 +130,7 @@ ${reviews
 
   return {
     analysis: {
+      shortTitle: parsed.shortTitle || "",
       positioningSummary: parsed.positioningSummary || "",
       keyFeatures: parsed.keyFeatures || [],
       detectedUsages: parsed.detectedUsages || [],

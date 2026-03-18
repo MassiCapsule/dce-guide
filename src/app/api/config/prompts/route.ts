@@ -24,6 +24,7 @@ Texte...
 
 ## Format de reponse attendu (JSON)
 {
+  "shortTitle": "Titre court du produit (marque + gamme + caracteristique cle, ex: Bosch OptiMUM 1600 W)",
   "positioningSummary": "Resume du positionnement produit en 2-3 phrases",
   "keyFeatures": ["caracteristique cle 1", ...],
   "detectedUsages": ["usage detecte 1", ...],

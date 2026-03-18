@@ -35,6 +35,7 @@ model ProductIntelligence {
   asin               String
   marketplace        String   @default("amazon.fr")
   productTitle       String   @default("")
+  shortTitle         String   @default("")
   productBrand       String   @default("")
   productPrice       String   @default("")
   productImageUrl    String   @default("")

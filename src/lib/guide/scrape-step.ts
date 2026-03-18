@@ -82,6 +82,7 @@ export async function executeScrapeAndAnalyze(guideId: string): Promise<void> {
         await prisma.productIntelligence.update({
           where: { id: fp.intelligence.id },
           data: {
+            shortTitle: result.analysis.shortTitle,
             positioningSummary: result.analysis.positioningSummary,
             keyFeatures: JSON.stringify(result.analysis.keyFeatures),
             detectedUsages: JSON.stringify(result.analysis.detectedUsages),
