@@ -55,8 +55,6 @@ export default function PlaygroundPage() {
   const [medias, setMedias] = useState<MediaOption[]>([]);
   const [segments, setSegments] = useState<PromptSegment[]>([]);
   const [fullPrompt, setFullPrompt] = useState("");
-  const [editablePrompt, setEditablePrompt] = useState("");
-  const [editMode, setEditMode] = useState(false);
 
   // Generation
   const [generatedHtml, setGeneratedHtml] = useState("");
@@ -68,10 +66,6 @@ export default function PlaygroundPage() {
   const [error, setError] = useState("");
 
   // Humanisation
-  const [humanizePrompt, setHumanizePrompt] = useState("");
-  const [editableHumanizePrompt, setEditableHumanizePrompt] = useState("");
-  const [humanizeEditMode, setHumanizeEditMode] = useState(false);
-  const [loadingHumanizePrompt, setLoadingHumanizePrompt] = useState(false);
   const [generatedHtmlV2, setGeneratedHtmlV2] = useState("");
   const [tokenInfoV2, setTokenInfoV2] = useState<{ promptTokens: number; completionTokens: number } | null>(null);
   const [loadingHumanize, setLoadingHumanize] = useState(false);
@@ -124,8 +118,6 @@ export default function PlaygroundPage() {
       const data = await res.json();
       setSegments(data.segments);
       setFullPrompt(data.fullPrompt);
-      setEditablePrompt(data.fullPrompt);
-      setEditMode(false);
     } catch {
       setError("Erreur réseau");
     } finally {
@@ -134,8 +126,7 @@ export default function PlaygroundPage() {
   };
 
   const handleGenerate = async () => {
-    const promptToSend = editMode ? editablePrompt : fullPrompt;
-    if (!promptToSend.trim()) {
+    if (!fullPrompt.trim()) {
       setError("Charge d'abord le prompt");
       return;
     }
@@ -147,7 +138,7 @@ export default function PlaygroundPage() {
       const res = await fetch("/api/playground/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: promptToSend, model }),
+        body: JSON.stringify({ prompt: fullPrompt, model }),
       });
       if (!res.ok) {
         const data = await res.json();
@@ -164,51 +155,38 @@ export default function PlaygroundPage() {
     }
   };
 
-  const handleLoadHumanizePrompt = async () => {
-    if (!generatedHtml || !mediaId) return;
-    setLoadingHumanizePrompt(true);
-    setError("");
-    try {
-      const res = await fetch("/api/playground/build-humanize-prompt", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ htmlV1: generatedHtml, mediaId }),
-      });
-      if (!res.ok) {
-        const data = await res.json();
-        setError(data.error || "Erreur");
-        return;
-      }
-      const data = await res.json();
-      setHumanizePrompt(data.prompt);
-      setEditableHumanizePrompt(data.prompt);
-      setHumanizeEditMode(false);
-    } catch {
-      setError("Erreur réseau");
-    } finally {
-      setLoadingHumanizePrompt(false);
-    }
-  };
-
   const handleHumanize = async () => {
-    const promptToSend = humanizeEditMode ? editableHumanizePrompt : humanizePrompt;
-    if (!promptToSend.trim()) return;
+    if (!generatedHtml || !mediaId) return;
     setError("");
     setLoadingHumanize(true);
     setGeneratedHtmlV2("");
     setTokenInfoV2(null);
     try {
-      const res = await fetch("/api/playground/generate", {
+      // 1. Build humanize prompt
+      const buildRes = await fetch("/api/playground/build-humanize-prompt", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: promptToSend, model }),
+        body: JSON.stringify({ htmlV1: generatedHtml, mediaId }),
       });
-      if (!res.ok) {
-        const data = await res.json();
+      if (!buildRes.ok) {
+        const data = await buildRes.json();
+        setError(data.error || "Erreur construction prompt");
+        return;
+      }
+      const { prompt } = await buildRes.json();
+
+      // 2. Generate V2
+      const genRes = await fetch("/api/playground/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt, model }),
+      });
+      if (!genRes.ok) {
+        const data = await genRes.json();
         setError(data.error || "Erreur de génération");
         return;
       }
-      const data = await res.json();
+      const data = await genRes.json();
       setGeneratedHtmlV2(data.html);
       setTokenInfoV2({ promptTokens: data.promptTokens, completionTokens: data.completionTokens });
     } catch {
@@ -314,56 +292,38 @@ export default function PlaygroundPage() {
           </CardContent>
         </Card>
 
-        {/* Zone prompt annotée */}
-        {(segments.length > 0 || editMode) && (
+        {/* Zone prompt annotée (lecture seule) */}
+        {segments.length > 0 && (
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
                 <CardTitle>Prompt</CardTitle>
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant={editMode ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => {
-                      if (!editMode) setEditablePrompt(fullPrompt);
-                      setEditMode(!editMode);
-                    }}
-                  >
-                    {editMode ? "Vue badges" : "Mode édition"}
-                  </Button>
-                  <Button onClick={handleGenerate} disabled={loadingGenerate}>
-                    {loadingGenerate && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                    Générer
-                  </Button>
-                </div>
+                <Button onClick={handleGenerate} disabled={loadingGenerate}>
+                  {loadingGenerate && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                  Générer
+                </Button>
               </div>
             </CardHeader>
             <CardContent>
-              {editMode ? (
-                <Textarea
-                  value={editablePrompt}
-                  onChange={(e) => setEditablePrompt(e.target.value)}
-                  rows={30}
-                  className="font-mono text-sm"
-                />
-              ) : (
-                <div className="whitespace-pre-wrap text-sm leading-relaxed font-mono bg-muted/30 rounded-lg p-4 max-h-[600px] overflow-y-auto">
-                  {segments.map((seg, i) =>
-                    seg.type === "static" ? (
-                      <span key={i}>{seg.text}</span>
-                    ) : (
-                      <span key={i} className="inline relative">
-                        <span className="text-[10px] font-sans font-medium text-violet-600 dark:text-violet-400 bg-violet-100 dark:bg-violet-900/40 px-1 rounded-t">
-                          {seg.name}
-                        </span>
-                        <span className="bg-violet-50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-700 rounded-b px-1 text-violet-900 dark:text-violet-100">
-                          {seg.text}
-                        </span>
+              <div className="whitespace-pre-wrap text-sm leading-relaxed font-mono bg-muted/30 rounded-lg p-4 max-h-[600px] overflow-y-auto">
+                {segments.map((seg, i) =>
+                  seg.type === "static" ? (
+                    <span key={i}>{seg.text}</span>
+                  ) : (
+                    <span key={i} className="inline relative">
+                      <span className="text-[10px] font-sans font-medium text-violet-600 dark:text-violet-400 bg-violet-100 dark:bg-violet-900/40 px-1 rounded-t">
+                        {seg.name}
                       </span>
-                    )
-                  )}
-                </div>
-              )}
+                      <span className="bg-violet-50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-700 rounded-b px-1 text-violet-900 dark:text-violet-100">
+                        {seg.text}
+                      </span>
+                    </span>
+                  )
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground mt-2">
+                Pour modifier le template, rendez-vous dans <a href="/parametres" className="underline hover:text-foreground">Paramètres → Prompts</a>.
+              </p>
             </CardContent>
           </Card>
         )}
@@ -381,8 +341,8 @@ export default function PlaygroundPage() {
                     </p>
                   )}
                   {generatedHtml && !loadingGenerate && (
-                    <Button size="sm" onClick={handleLoadHumanizePrompt} disabled={loadingHumanizePrompt}>
-                      {loadingHumanizePrompt && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                    <Button size="sm" onClick={handleHumanize} disabled={loadingHumanize}>
+                      {loadingHumanize && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
                       Humaniser
                     </Button>
                   )}
@@ -417,47 +377,6 @@ export default function PlaygroundPage() {
                     </pre>
                   </TabsContent>
                 </Tabs>
-              )}
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Zone prompt humaniser */}
-        {(humanizePrompt || loadingHumanizePrompt) && (
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle>Prompt Humaniser</CardTitle>
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant={humanizeEditMode ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => {
-                      if (!humanizeEditMode) setEditableHumanizePrompt(humanizePrompt);
-                      setHumanizeEditMode(!humanizeEditMode);
-                    }}
-                  >
-                    {humanizeEditMode ? "Vue brute" : "Mode édition"}
-                  </Button>
-                  <Button onClick={handleHumanize} disabled={loadingHumanize}>
-                    {loadingHumanize && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                    Lancer
-                  </Button>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              {humanizeEditMode ? (
-                <Textarea
-                  value={editableHumanizePrompt}
-                  onChange={(e) => setEditableHumanizePrompt(e.target.value)}
-                  rows={30}
-                  className="font-mono text-sm"
-                />
-              ) : (
-                <pre className="whitespace-pre-wrap text-sm leading-relaxed font-mono bg-muted/30 rounded-lg p-4 max-h-[600px] overflow-y-auto">
-                  {humanizePrompt}
-                </pre>
               )}
             </CardContent>
           </Card>

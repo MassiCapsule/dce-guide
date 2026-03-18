@@ -128,7 +128,8 @@ export async function generatePlan(guideId: string): Promise<void> {
 
     if (!guide) throw new Error("Guide introuvable");
 
-    const model = await getConfigModel("plan");
+    // Priorité modèle : média > config globale
+    const model = guide.media?.modelPlan?.trim() || await getConfigModel("plan");
 
     // Priorité : prompt du média > défaut
     const promptTemplate = guide.media?.promptPlan?.trim() || DEFAULT_PLAN_PROMPT;

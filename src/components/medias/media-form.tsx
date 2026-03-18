@@ -13,7 +13,27 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+
+const MODELS = [
+  { value: "gpt-5.4", label: "GPT-5.4", provider: "OpenAI" },
+  { value: "gpt-5-mini", label: "GPT-5 Mini", provider: "OpenAI" },
+  { value: "claude-sonnet-4-20250514", label: "Claude Sonnet 4", provider: "Anthropic" },
+  { value: "claude-opus-4-20250514", label: "Claude Opus 4", provider: "Anthropic" },
+  { value: "claude-haiku-4-20250414", label: "Claude Haiku 4", provider: "Anthropic" },
+];
+
+const OPENAI_MODELS = MODELS.filter((m) => m.provider === "OpenAI");
+const ANTHROPIC_MODELS = MODELS.filter((m) => m.provider === "Anthropic");
 
 interface MediaFormProps {
   media?: {
@@ -27,6 +47,7 @@ interface MediaFormProps {
     productStructureTemplate: string;
     defaultProductWordCount: number;
     promptPlan: string;
+    modelPlan: string;
     forbiddenWords: string;
   };
 }
@@ -65,6 +86,7 @@ export function MediaForm({ media }: MediaFormProps) {
     media?.defaultProductWordCount ?? 800
   );
   const [promptPlan, setPromptPlan] = useState(media?.promptPlan ?? "");
+  const [modelPlan, setModelPlan] = useState(media?.modelPlan || "__global__");
   const [forbiddenWords, setForbiddenWords] = useState(() => {
     if (!media?.forbiddenWords) return "";
     try {
@@ -105,6 +127,7 @@ export function MediaForm({ media }: MediaFormProps) {
         productStructureTemplate,
         defaultProductWordCount,
         promptPlan,
+        modelPlan: modelPlan === "__global__" ? "" : modelPlan,
       };
 
       const url = isEditing ? `/api/medias/${media.id}` : "/api/medias";
@@ -266,6 +289,33 @@ export function MediaForm({ media }: MediaFormProps) {
               min={100}
               max={5000}
             />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="modelPlan">Modèle IA pour le plan</Label>
+            <Select value={modelPlan} onValueChange={setModelPlan}>
+              <SelectTrigger>
+                <SelectValue placeholder="Config globale (Paramètres)" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__global__">Config globale (Paramètres)</SelectItem>
+                <SelectGroup>
+                  <SelectLabel>OpenAI</SelectLabel>
+                  {OPENAI_MODELS.map((m) => (
+                    <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
+                  ))}
+                </SelectGroup>
+                <SelectGroup>
+                  <SelectLabel>Anthropic</SelectLabel>
+                  {ANTHROPIC_MODELS.map((m) => (
+                    <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
+                  ))}
+                </SelectGroup>
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              Si vide, utilise le modèle configuré dans Paramètres.
+            </p>
           </div>
 
           <div className="space-y-2">

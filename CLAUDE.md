@@ -262,7 +262,7 @@ Au submit du formulaire de création :
 | `/medias` | Profils éditoriaux (ton, style, template) |
 | `/produits` | Produits scrappés |
 | `/intelligence` | Analyses IA structurées |
-| `/playground` | Playground : tester le prompt fiche produit (V1 génération + bouton Humaniser + prompt éditable + V2 humanisée) |
+| `/playground` | Playground : tester le prompt fiche produit (V1 génération + bouton Humaniser + prompts lecture seule avec lien vers Paramètres + V2 humanisée) |
 | `/parametres` | Config runtime : 2 onglets — Prompts (Critères Perplexity, Analyse, Generation, Humaniser + modèle IA par étape) et Clés API (OpenAI, Anthropic, Apify, Serpmantics) |
 
 ---
@@ -338,7 +338,11 @@ Le prompt est résolu dans cet ordre de priorité :
 1. `media.promptPlan` (champ sur le média, éditable dans `/medias/[id]`)
 2. `DEFAULT_PLAN_PROMPT` (hardcodé dans `plan-generator.ts`)
 
-Note : le prompt plan n'est plus dans Paramètres (AppConfig `prompt_plan` supprimé de l'UI). Chaque média a son propre prompt plan.
+Le modèle IA est résolu dans cet ordre de priorité :
+1. `media.modelPlan` (sélecteur sur le média, éditable dans `/medias/[id]`)
+2. Config globale `model_plan` (AppConfig, éditable dans `/parametres`)
+
+Note : le prompt plan n'est plus dans Paramètres (AppConfig `prompt_plan` supprimé de l'UI). Chaque média a son propre prompt plan et modèle IA.
 
 **Placeholders disponibles :** `#NomMedia`, `#MotClePrincipal`, `#NombreMots`, `#Criteres`, `#ResumeProduits`, `#MotsCles`
 
@@ -390,6 +394,7 @@ Le prompt est un **template éditable** dans Paramètres > Analyse (clé `prompt
 | `forbiddenWords` | `{forbiddenWords}` | Interdits lexicaux (JSON array, un par ligne) |
 | `defaultProductWordCount` | — | Nombre de mots par fiche produit |
 | `promptPlan` | — | Prompt plan spécifique au média (placeholders `#NomMedia`, etc.) |
+| `modelPlan` | — | Modèle IA pour la génération du plan (vide = config globale Paramètres) |
 
 Champs **retirés de l'UI média** (restent en DB) : `productStructureTemplate`
 
@@ -471,3 +476,8 @@ Champs **retirés de l'UI média** (restent en DB) : `productStructureTemplate`
 | 2026-03-18 | Route `POST /api/playground/build-humanize-prompt` — résout placeholders média + injecte HTML V1 |
 | 2026-03-18 | Sous-onglet "Humaniser" ajouté dans Paramètres > Prompts (clé `prompt_humaniser`) |
 | 2026-03-18 | Helper `bullet()` dans prompt builders — évite le double tiret quand les règles commencent déjà par `- ` |
+| 2026-03-18 | Playground : prompts passés en lecture seule (plus de mode édition) + lien "Paramètres → Prompts" sous chaque prompt |
+| 2026-03-18 | Playground : bouton "Humaniser" fusionne build prompt + génération V2 en un seul clic (suppression carte intermédiaire) |
+| 2026-03-18 | Placeholder `{forbiddenWords}` supporté dans le prompt humaniser (`build-humanize-prompt`) |
+| 2026-03-18 | Champ `modelPlan` ajouté au modèle Media (migration) — modèle IA spécifique au média pour la génération du plan |
+| 2026-03-18 | Plan-generator : priorité `media.modelPlan` > config globale `model_plan` |

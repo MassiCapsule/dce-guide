@@ -33,6 +33,12 @@ export async function POST(req: NextRequest) {
     prompt = prompt.replace(/\{media\.toneDescription\}/g, media.toneDescription || "");
     prompt = prompt.replace(/\{media\.writingStyle\}/g, media.writingStyle || "");
 
+    // Replace forbidden words
+    let forbiddenWords: string[] = [];
+    try { forbiddenWords = JSON.parse(media.forbiddenWords); } catch { forbiddenWords = []; }
+    const bullet = (s: string) => s.startsWith("- ") ? s : `- ${s}`;
+    prompt = prompt.replace(/\{forbiddenWords\}/g, forbiddenWords.map(bullet).join("\n"));
+
     // Replace the HTML V1 placeholder
     prompt = prompt.replace(/\{\{fiche_produit_v1\}\}/g, htmlV1);
 
