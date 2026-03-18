@@ -5,52 +5,100 @@ import { Save, Check } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Header } from "@/components/layout/header";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
 
 const MODELS = [
-  { value: "gpt-4o", label: "GPT-4o", desc: "~2.50$/M input, ~10$/M output" },
-  { value: "gpt-4o-mini", label: "GPT-4o Mini", desc: "~0.15$/M input, ~0.60$/M output" },
-  { value: "gpt-4-turbo", label: "GPT-4 Turbo", desc: "~10$/M input, ~30$/M output" },
-  { value: "o1", label: "o1", desc: "~15$/M input, ~60$/M output" },
-  { value: "o1-mini", label: "o1-mini", desc: "~1.10$/M input, ~4.40$/M output" },
+  { value: "gpt-5.4", label: "GPT-5.4", provider: "OpenAI" },
+  { value: "gpt-5-mini", label: "GPT-5 Mini", provider: "OpenAI" },
+  { value: "claude-sonnet-4-20250514", label: "Claude Sonnet 4", provider: "Anthropic" },
+  { value: "claude-opus-4-20250514", label: "Claude Opus 4", provider: "Anthropic" },
+  { value: "claude-haiku-4-20250414", label: "Claude Haiku 4", provider: "Anthropic" },
 ];
 
-interface DailyCost {
-  totalCost: number;
-  generationCost: number;
-  analysisCost: number;
-  scrapingCost: number;
-  cardCount: number;
+const OPENAI_MODELS = MODELS.filter((m) => m.provider === "OpenAI");
+const ANTHROPIC_MODELS = MODELS.filter((m) => m.provider === "Anthropic");
+
+type PromptKey = "generation" | "analysis" | "criteres" | "plan";
+
+const PROMPT_TABS: { key: PromptKey; label: string; hasModel: boolean }[] = [
+  { key: "criteres", label: "Criteres Perplexity", hasModel: false },
+  { key: "analysis", label: "Analyse", hasModel: true },
+  { key: "generation", label: "Generation", hasModel: true },
+  { key: "plan", label: "Plan", hasModel: true },
+];
+
+function ModelSelector({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  return (
+    <Select value={value} onValueChange={onChange}>
+      <SelectTrigger className="w-[240px]">
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectGroup>
+          <SelectLabel>OpenAI</SelectLabel>
+          {OPENAI_MODELS.map((m) => (
+            <SelectItem key={m.value} value={m.value}>
+              {m.label}
+            </SelectItem>
+          ))}
+        </SelectGroup>
+        <SelectGroup>
+          <SelectLabel>Anthropic</SelectLabel>
+          {ANTHROPIC_MODELS.map((m) => (
+            <SelectItem key={m.value} value={m.value}>
+              {m.label}
+            </SelectItem>
+          ))}
+        </SelectGroup>
+      </SelectContent>
+    </Select>
+  );
 }
 
 export default function ParametresPage() {
-  const [model, setModel] = useState("gpt-4o");
-  const [keys, setKeys] = useState<{ openai: string; apify: string }>({ openai: "", apify: "" });
-  const [daily, setDaily] = useState<DailyCost | null>(null);
-  const [saving, setSaving] = useState(false);
+  const [keys, setKeys] = useState<{ openai: string; anthropic: string; apify: string; serpmantics: string }>({ openai: "", anthropic: "", apify: "", serpmantics: "" });
   const [generationPrompt, setGenerationPrompt] = useState("");
   const [analysisPrompt, setAnalysisPrompt] = useState("");
   const [criteresPrompt, setCriteresPrompt] = useState("");
   const [planPrompt, setPlanPrompt] = useState("");
-  const [promptTab, setPromptTab] = useState<"generation" | "analysis" | "criteres" | "plan">("generation");
+  const [promptTab, setPromptTab] = useState<PromptKey>("criteres");
   const [promptSaved, setPromptSaved] = useState(false);
+
+  // Per-prompt models
+  const [modelGeneration, setModelGeneration] = useState("gpt-4o");
+  const [modelAnalysis, setModelAnalysis] = useState("gpt-4o");
+  const [modelPlan, setModelPlan] = useState("gpt-4o");
+
+  // API keys
+  const [openaiKey, setOpenaiKey] = useState("");
+  const [anthropicKey, setAnthropicKey] = useState("");
+  const [anthropicKeySaved, setAnthropicKeySaved] = useState(false);
+  const [apifyKey, setApifyKey] = useState("");
   const [serpmanticsKey, setSerpmanticsKey] = useState("");
+  const [openaiKeySaved, setOpenaiKeySaved] = useState(false);
+  const [apifyKeySaved, setApifyKeySaved] = useState(false);
   const [serpmanticsKeySaved, setSerpmanticsKeySaved] = useState(false);
 
   useEffect(() => {
     fetch("/api/config")
       .then((r) => r.json())
       .then((data) => {
-        if (data.openai_model) setModel(data.openai_model);
+        // Per-prompt models (fallback to legacy openai_model)
+        const fallbackModel = data.openai_model || "gpt-4o";
+        setModelGeneration(data.model_generation || fallbackModel);
+        setModelAnalysis(data.model_analysis || fallbackModel);
+        setModelPlan(data.model_plan || fallbackModel);
         if (data.prompt_generation) setGenerationPrompt(data.prompt_generation);
         if (data.prompt_analysis) setAnalysisPrompt(data.prompt_analysis);
         if (data.prompt_criteres) setCriteresPrompt(data.prompt_criteres);
@@ -58,8 +106,6 @@ export default function ParametresPage() {
         if (data.serpmantics_api_key) setSerpmanticsKey(data.serpmantics_api_key);
       });
     fetch("/api/config/keys").then((r) => r.json()).then(setKeys);
-    fetch("/api/stats/daily-cost").then((r) => r.json()).then(setDaily);
-    // Load defaults if not yet saved in config
     fetch("/api/config/prompts")
       .then((r) => r.json())
       .then((defaults) => {
@@ -70,15 +116,32 @@ export default function ParametresPage() {
       });
   }, []);
 
-  const handleModelChange = async (value: string) => {
-    setModel(value);
-    setSaving(true);
+  const saveModelForPrompt = async (configKey: string, value: string) => {
     await fetch("/api/config", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ key: "openai_model", value }),
+      body: JSON.stringify({ key: configKey, value }),
     });
-    setSaving(false);
+  };
+
+  const handleModelChange = (purpose: PromptKey, value: string) => {
+    if (purpose === "generation") {
+      setModelGeneration(value);
+      saveModelForPrompt("model_generation", value);
+    } else if (purpose === "analysis") {
+      setModelAnalysis(value);
+      saveModelForPrompt("model_analysis", value);
+    } else if (purpose === "plan") {
+      setModelPlan(value);
+      saveModelForPrompt("model_plan", value);
+    }
+  };
+
+  const getCurrentModel = (tab: PromptKey) => {
+    if (tab === "generation") return modelGeneration;
+    if (tab === "analysis") return modelAnalysis;
+    if (tab === "plan") return modelPlan;
+    return "";
   };
 
   const savePrompt = useCallback(async () => {
@@ -109,225 +172,216 @@ export default function ParametresPage() {
     setTimeout(() => setPromptSaved(false), 2000);
   }, [generationPrompt, analysisPrompt, criteresPrompt, planPrompt]);
 
-  const saveSerpmanticsKey = async () => {
+  const saveApiKey = async (configKey: string, value: string, setSaved: (v: boolean) => void) => {
     await fetch("/api/config", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ key: "serpmantics_api_key", value: serpmanticsKey }),
+      body: JSON.stringify({ key: configKey, value }),
     });
-    setSerpmanticsKeySaved(true);
-    setTimeout(() => setSerpmanticsKeySaved(false), 2000);
+    fetch("/api/config/keys").then((r) => r.json()).then(setKeys);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
   };
+
+  const getPromptValue = (tab: PromptKey) => {
+    if (tab === "generation") return generationPrompt;
+    if (tab === "analysis") return analysisPrompt;
+    if (tab === "criteres") return criteresPrompt;
+    return planPrompt;
+  };
+
+  const setPromptValue = (tab: PromptKey, value: string) => {
+    if (tab === "generation") setGenerationPrompt(value);
+    else if (tab === "analysis") setAnalysisPrompt(value);
+    else if (tab === "criteres") setCriteresPrompt(value);
+    else setPlanPrompt(value);
+  };
+
+  const currentTabConfig = PROMPT_TABS.find((t) => t.key === promptTab)!;
 
   return (
     <>
       <Header title="Parametres" />
       <main className="p-6">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Colonne gauche : Config */}
-          <div className="space-y-6">
-            {/* API Keys */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Cles API</CardTitle>
-                <CardDescription>Definies dans le fichier .env</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <Label>OpenAI</Label>
-                  <code className="text-xs bg-muted px-2 py-1 rounded font-mono">
-                    {keys.openai || "Non configuree"}
-                  </code>
-                </div>
-                <div className="flex items-center justify-between">
-                  <Label>Apify</Label>
-                  <code className="text-xs bg-muted px-2 py-1 rounded font-mono">
-                    {keys.apify || "Non configuree"}
-                  </code>
-                </div>
-                <div className="space-y-1.5">
-                  <Label>Serpmantics</Label>
-                  <div className="flex gap-2">
-                    <Input
-                      type="password"
-                      value={serpmanticsKey}
-                      onChange={(e) => setSerpmanticsKey(e.target.value)}
-                      placeholder="Colle ta clé API ici..."
-                      className="flex-1 font-mono text-xs"
-                    />
-                    <Button size="sm" onClick={saveSerpmanticsKey}>
-                      {serpmanticsKeySaved ? (
-                        <Check className="h-3.5 w-3.5 text-green-600" />
-                      ) : (
-                        <Save className="h-3.5 w-3.5" />
-                      )}
-                    </Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+        <Tabs defaultValue="prompts">
+          <TabsList className="mb-6">
+            <TabsTrigger value="prompts">Prompts</TabsTrigger>
+            <TabsTrigger value="keys">Cles API</TabsTrigger>
+          </TabsList>
 
-            {/* Model Selection */}
+          {/* Onglet Prompts */}
+          <TabsContent value="prompts">
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">Modele OpenAI</CardTitle>
-                <CardDescription>
-                  Utilise pour la generation et l&apos;analyse
-                </CardDescription>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="text-base">Prompts IA</CardTitle>
+                    <CardDescription>
+                      Editez les prompts et choisissez le modele pour chaque etape
+                    </CardDescription>
+                  </div>
+                  <Button size="sm" onClick={savePrompt}>
+                    {promptSaved ? (
+                      <Check className="mr-2 h-3.5 w-3.5 text-green-600" />
+                    ) : (
+                      <Save className="mr-2 h-3.5 w-3.5" />
+                    )}
+                    {promptSaved ? "Enregistre" : "Enregistrer"}
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent>
-                <div className="flex items-center gap-4">
-                  <Select value={model} onValueChange={handleModelChange}>
-                    <SelectTrigger className="w-[220px]">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {MODELS.map((m) => (
-                        <SelectItem key={m.value} value={m.value}>
-                          <span className="font-medium">{m.label}</span>
-                          <span className="text-xs text-muted-foreground ml-2">{m.desc}</span>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {saving && <span className="text-xs text-muted-foreground">Enregistrement...</span>}
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Daily Cost */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Couts API du jour</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {daily ? (
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm">Fiches generees</span>
-                      <Badge variant="secondary">{daily.cardCount}</Badge>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm">Scraping Apify</span>
-                      <span className="text-sm font-mono">{daily.scrapingCost.toFixed(4)} $</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm">Analyse OpenAI</span>
-                      <span className="text-sm font-mono">{daily.analysisCost.toFixed(4)} $</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm">Generation OpenAI</span>
-                      <span className="text-sm font-mono">{daily.generationCost.toFixed(4)} $</span>
-                    </div>
-                    <div className="flex items-center justify-between border-t pt-2">
-                      <span className="text-sm font-semibold">Total du jour</span>
-                      <span className="text-sm font-mono font-semibold">{daily.totalCost.toFixed(4)} $</span>
-                    </div>
+                <div className="space-y-3">
+                  {/* Sub-tabs prompts */}
+                  <div className="flex gap-1">
+                    {PROMPT_TABS.map((tab) => (
+                      <button
+                        key={tab.key}
+                        onClick={() => setPromptTab(tab.key)}
+                        className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                          promptTab === tab.key
+                            ? "bg-primary text-primary-foreground"
+                            : "bg-muted text-muted-foreground hover:text-foreground"
+                        }`}
+                      >
+                        {tab.label}
+                      </button>
+                    ))}
                   </div>
-                ) : (
-                  <p className="text-sm text-muted-foreground">Chargement...</p>
-                )}
-              </CardContent>
-            </Card>
-          </div>
 
-          {/* Colonne droite : Prompts */}
-          <Card className="h-fit">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="text-base">Prompts OpenAI</CardTitle>
-                  <CardDescription>
-                    Editez les prompts envoyes a OpenAI
-                  </CardDescription>
-                </div>
-                <Button size="sm" onClick={savePrompt}>
-                  {promptSaved ? (
-                    <Check className="mr-2 h-3.5 w-3.5 text-green-600" />
-                  ) : (
-                    <Save className="mr-2 h-3.5 w-3.5" />
+                  {/* Model selector per prompt */}
+                  {currentTabConfig.hasModel && (
+                    <div className="flex items-center gap-3">
+                      <Label className="text-xs text-muted-foreground whitespace-nowrap">Modele :</Label>
+                      <ModelSelector
+                        value={getCurrentModel(promptTab)}
+                        onChange={(v) => handleModelChange(promptTab, v)}
+                      />
+                    </div>
                   )}
-                  {promptSaved ? "Enregistre" : "Enregistrer"}
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                <div className="flex gap-1">
-                  <button
-                    onClick={() => setPromptTab("generation")}
-                    className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
-                      promptTab === "generation"
-                        ? "bg-primary text-primary-foreground"
-                        : "bg-muted text-muted-foreground hover:text-foreground"
-                    }`}
-                  >
-                    Generation
-                  </button>
-                  <button
-                    onClick={() => setPromptTab("analysis")}
-                    className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
-                      promptTab === "analysis"
-                        ? "bg-primary text-primary-foreground"
-                        : "bg-muted text-muted-foreground hover:text-foreground"
-                    }`}
-                  >
-                    Analyse
-                  </button>
-                  <button
-                    onClick={() => setPromptTab("criteres")}
-                    className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
-                      promptTab === "criteres"
-                        ? "bg-primary text-primary-foreground"
-                        : "bg-muted text-muted-foreground hover:text-foreground"
-                    }`}
-                  >
-                    Critères Perplexity
-                  </button>
-                  <button
-                    onClick={() => setPromptTab("plan")}
-                    className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
-                      promptTab === "plan"
-                        ? "bg-primary text-primary-foreground"
-                        : "bg-muted text-muted-foreground hover:text-foreground"
-                    }`}
-                  >
-                    Plan
-                  </button>
+
+                  {/* Prompt textarea */}
+                  <textarea
+                    value={getPromptValue(promptTab)}
+                    onChange={(e) => setPromptValue(promptTab, e.target.value)}
+                    className="w-full h-[500px] text-xs bg-muted p-4 rounded-lg font-mono leading-relaxed resize-y border-0 focus:outline-none focus:ring-2 focus:ring-ring"
+                    spellCheck={false}
+                  />
                 </div>
-                {promptTab === "generation" ? (
-                  <textarea
-                    value={generationPrompt}
-                    onChange={(e) => setGenerationPrompt(e.target.value)}
-                    className="w-full h-[500px] text-xs bg-muted p-4 rounded-lg font-mono leading-relaxed resize-y border-0 focus:outline-none focus:ring-2 focus:ring-ring"
-                    spellCheck={false}
-                  />
-                ) : promptTab === "analysis" ? (
-                  <textarea
-                    value={analysisPrompt}
-                    onChange={(e) => setAnalysisPrompt(e.target.value)}
-                    className="w-full h-[500px] text-xs bg-muted p-4 rounded-lg font-mono leading-relaxed resize-y border-0 focus:outline-none focus:ring-2 focus:ring-ring"
-                    spellCheck={false}
-                  />
-                ) : promptTab === "criteres" ? (
-                  <textarea
-                    value={criteresPrompt}
-                    onChange={(e) => setCriteresPrompt(e.target.value)}
-                    className="w-full h-[500px] text-xs bg-muted p-4 rounded-lg font-mono leading-relaxed resize-y border-0 focus:outline-none focus:ring-2 focus:ring-ring"
-                    spellCheck={false}
-                  />
-                ) : (
-                  <textarea
-                    value={planPrompt}
-                    onChange={(e) => setPlanPrompt(e.target.value)}
-                    className="w-full h-[500px] text-xs bg-muted p-4 rounded-lg font-mono leading-relaxed resize-y border-0 focus:outline-none focus:ring-2 focus:ring-ring"
-                    spellCheck={false}
-                  />
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Onglet Cles API */}
+          <TabsContent value="keys">
+            <div className="max-w-xl">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Cles API</CardTitle>
+                  <CardDescription>Sauvegardees en base de donnees. Les cles du fichier .env sont utilisees en fallback.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <Label>OpenAI</Label>
+                      {keys.openai && (
+                        <code className="text-xs text-muted-foreground font-mono">{keys.openai}</code>
+                      )}
+                    </div>
+                    <div className="flex gap-2">
+                      <Input
+                        type="password"
+                        value={openaiKey}
+                        onChange={(e) => setOpenaiKey(e.target.value)}
+                        placeholder="sk-..."
+                        className="flex-1 font-mono text-xs"
+                      />
+                      <Button size="sm" onClick={() => saveApiKey("openai_api_key", openaiKey, setOpenaiKeySaved)}>
+                        {openaiKeySaved ? (
+                          <Check className="h-3.5 w-3.5 text-green-600" />
+                        ) : (
+                          <Save className="h-3.5 w-3.5" />
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <Label>Anthropic</Label>
+                      {keys.anthropic && (
+                        <code className="text-xs text-muted-foreground font-mono">{keys.anthropic}</code>
+                      )}
+                    </div>
+                    <div className="flex gap-2">
+                      <Input
+                        type="password"
+                        value={anthropicKey}
+                        onChange={(e) => setAnthropicKey(e.target.value)}
+                        placeholder="sk-ant-..."
+                        className="flex-1 font-mono text-xs"
+                      />
+                      <Button size="sm" onClick={() => saveApiKey("anthropic_api_key", anthropicKey, setAnthropicKeySaved)}>
+                        {anthropicKeySaved ? (
+                          <Check className="h-3.5 w-3.5 text-green-600" />
+                        ) : (
+                          <Save className="h-3.5 w-3.5" />
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <Label>Apify</Label>
+                      {keys.apify && (
+                        <code className="text-xs text-muted-foreground font-mono">{keys.apify}</code>
+                      )}
+                    </div>
+                    <div className="flex gap-2">
+                      <Input
+                        type="password"
+                        value={apifyKey}
+                        onChange={(e) => setApifyKey(e.target.value)}
+                        placeholder="apify_api_..."
+                        className="flex-1 font-mono text-xs"
+                      />
+                      <Button size="sm" onClick={() => saveApiKey("apify_api_token", apifyKey, setApifyKeySaved)}>
+                        {apifyKeySaved ? (
+                          <Check className="h-3.5 w-3.5 text-green-600" />
+                        ) : (
+                          <Save className="h-3.5 w-3.5" />
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <Label>Serpmantics</Label>
+                      {keys.serpmantics && (
+                        <code className="text-xs text-muted-foreground font-mono">{keys.serpmantics}</code>
+                      )}
+                    </div>
+                    <div className="flex gap-2">
+                      <Input
+                        type="password"
+                        value={serpmanticsKey}
+                        onChange={(e) => setSerpmanticsKey(e.target.value)}
+                        placeholder="Colle ta cle API ici..."
+                        className="flex-1 font-mono text-xs"
+                      />
+                      <Button size="sm" onClick={() => saveApiKey("serpmantics_api_key", serpmanticsKey, setSerpmanticsKeySaved)}>
+                        {serpmanticsKeySaved ? (
+                          <Check className="h-3.5 w-3.5 text-green-600" />
+                        ) : (
+                          <Save className="h-3.5 w-3.5" />
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+        </Tabs>
       </main>
     </>
   );

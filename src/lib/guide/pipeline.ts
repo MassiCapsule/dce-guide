@@ -41,7 +41,7 @@ export async function executeGuidePipeline(guideId: string): Promise<void> {
 
     if (!guide) throw new Error("Guide introuvable");
 
-    const model = await getConfigModel();
+    const model = await getConfigModel("generation");
     let totalCost = 0;
 
     // --- ETAPE 1: SCRAPING ---
@@ -169,9 +169,8 @@ export async function executeGuidePipeline(guideId: string): Promise<void> {
       const { stream, getUsage } = await generateStream(prompt, model);
 
       let fullContent = "";
-      for await (const chunk of stream) {
-        const text = chunk.choices[0]?.delta?.content || "";
-        if (text) fullContent += text;
+      for await (const text of stream) {
+        fullContent += text;
       }
 
       const usage = getUsage();

@@ -1,4 +1,4 @@
-import { openai } from "@/lib/openai";
+import { chatCompletion } from "@/lib/ai-client";
 import type { AmazonProductData } from "@/lib/scraper/amazon-product";
 import type { AmazonReview } from "@/lib/scraper/amazon-reviews";
 
@@ -60,22 +60,16 @@ ${reviews
   "remarkableQuotes": ["citation remarquable 1", ... (6 a 12 elements)]
 }`;
 
-  const response = await openai.chat.completions.create({
-    model,
-    messages: [
-      { role: "system", content: systemPrompt },
-      { role: "user", content: userPrompt },
-    ],
-    response_format: { type: "json_object" },
-    temperature: 0.3,
-  });
+  const response = await chatCompletion(model, [
+    { role: "system", content: systemPrompt },
+    { role: "user", content: userPrompt },
+  ], { temperature: 0.3, jsonMode: true });
 
-  const content = response.choices[0]?.message?.content;
-  if (!content) {
-    throw new Error("Reponse vide de l'API OpenAI");
+  if (!response.content) {
+    throw new Error("Reponse vide de l'API");
   }
 
-  const parsed = JSON.parse(content) as ReviewAnalysis;
+  const parsed = JSON.parse(response.content) as ReviewAnalysis;
 
   return {
     analysis: {
@@ -89,8 +83,8 @@ ${reviews
       weaknessPoints: parsed.weaknessPoints || [],
       remarkableQuotes: parsed.remarkableQuotes || [],
     },
-    promptTokens: response.usage?.prompt_tokens || 0,
-    completionTokens: response.usage?.completion_tokens || 0,
+    promptTokens: response.promptTokens,
+    completionTokens: response.completionTokens,
     model,
   };
 }

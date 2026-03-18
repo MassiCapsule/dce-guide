@@ -45,7 +45,7 @@ export async function POST(req: Request) {
 
     const targetWordCount = wordCount || media.defaultProductWordCount;
     const prompt = buildGenerationPrompt(media, intelligence, keyword, targetWordCount);
-    const model = await getConfigModel();
+    const model = await getConfigModel("generation");
 
     const { stream: openaiStream, getUsage } = await generateStream(prompt, model);
 
@@ -57,8 +57,7 @@ export async function POST(req: Request) {
 
     (async () => {
       try {
-        for await (const chunk of openaiStream) {
-          const text = chunk.choices[0]?.delta?.content || "";
+        for await (const text of openaiStream) {
           if (text) {
             fullContent += text;
             await writer.write(encoder.encode(text));

@@ -19,7 +19,7 @@ npm run dev
 ## Ce que fait ce projet
 Générateur de guides d'achat SEO avec fiches produits Amazon.
 - Scrape les produits Amazon via **Apify**
-- Analyse les avis avec **OpenAI GPT-4o**
+- Analyse les avis avec **OpenAI** ou **Anthropic** (modèle configurable par étape)
 - Génère des fiches HTML optimisées SEO
 - Intègre **Serpmantics** pour les mots-clés sémantiques
 
@@ -30,7 +30,8 @@ Générateur de guides d'achat SEO avec fiches produits Amazon.
 - **SQLite** via Prisma ORM (`dev.db`)
 - **Tailwind CSS** + shadcn/ui (Radix) + **@tailwindcss/typography**
 - **TipTap v3** (éditeur WYSIWYG — installé le 2026-03-13)
-- **OpenAI** (génération + analyse)
+- **OpenAI** (génération + analyse — configurable par étape)
+- **Anthropic** (alternative à OpenAI — configurable par étape)
 - **Apify** (scraping Amazon)
 - **Serpmantics** (guide sémantique + mots-clés)
 
@@ -42,7 +43,7 @@ Générateur de guides d'achat SEO avec fiches produits Amazon.
 | Fichier | Rôle |
 |---------|------|
 | `src/components/guides/guide-form.tsx` | Formulaire création guides (keyword + media uniquement) — sans critères, sans ASINs |
-| `src/app/parametres/page.tsx` | Page config : clés API, modèle OpenAI, prompts (Generation, Analyse, Critères Perplexity, Plan) |
+| `src/app/parametres/page.tsx` | Page config : 2 onglets (Prompts, Clés API). Prompts avec modèle IA par étape (Critères Perplexity, Analyse, Generation, Plan) |
 | `src/components/editor/rich-editor.tsx` | Éditeur WYSIWYG TipTap v3 (H1/H2/H3, gras, listes, tableau) |
 | `src/components/editor/seo-score-bar.tsx` | Barre score SEO Serpmantics + pills mots-clés |
 | `src/components/editor/meta-fields.tsx` | Champs méta : slug, meta title, meta desc, légende image |
@@ -79,13 +80,15 @@ Générateur de guides d'achat SEO avec fiches produits Amazon.
 ### Lib / Services
 | Fichier | Rôle |
 |---------|------|
-| `src/lib/openai.ts` | Client OpenAI singleton |
-| `src/lib/apify.ts` | Client Apify singleton |
+| `src/lib/ai-client.ts` | Client IA unifié — `chatCompletion()` et `chatCompletionStream()` routent vers OpenAI ou Anthropic selon le modèle |
+| `src/lib/openai.ts` | Client OpenAI — `getOpenAIClient()` (clé DB puis .env) |
+| `src/lib/anthropic.ts` | Client Anthropic — `getAnthropicClient()` (clé DB puis .env) |
+| `src/lib/apify.ts` | Client Apify — `getApifyClient()` (clé DB puis .env) |
 | `src/lib/prisma.ts` | Client Prisma singleton |
 | `src/lib/keywords/distributor.ts` | Distribution mots-clés entre produits |
 | `src/lib/guide/pipeline.ts` | (legacy) Pipeline complet monolithique |
-| `src/lib/guide/scrape-step.ts` | Scraping Apify + analyse OpenAI — status: scraping → analyzing → products-ready |
-| `src/lib/guide/plan-generator.ts` | Génération du plan OpenAI — status: generating-plan → plan-ready |
+| `src/lib/guide/scrape-step.ts` | Scraping Apify + analyse IA (modèle `model_analysis`) — status: scraping → analyzing → products-ready |
+| `src/lib/guide/plan-generator.ts` | Génération du plan IA (modèle `model_plan`) — status: generating-plan → plan-ready |
 | `src/lib/guide/article-generator.ts` | Distribution mots-clés + génération fiches + assemblage — status: distributing → generating → complete |
 
 ---
@@ -93,7 +96,7 @@ Générateur de guides d'achat SEO avec fiches produits Amazon.
 ## Base de données (Prisma / SQLite)
 
 ### Modèles principaux
-- **AppConfig** : clé-valeur pour la config runtime (modèle OpenAI, prompts, clé Serpmantics)
+- **AppConfig** : clé-valeur pour la config runtime (modèles IA par étape, prompts, clés API)
 - **Media** : profils éditoriaux avec ton, style, règles, template
 - **Guide** : guide d'achat avec statut, HTML généré, coûts, wordCountMin/Max, planHtml, guideHtml
 - **GuideProduct** : produits d'un guide avec allocation mots-clés
@@ -120,24 +123,31 @@ Générateur de guides d'achat SEO avec fiches produits Amazon.
 ### Clés AppConfig importantes
 | Clé | Contenu |
 |-----|---------|
-| `openai_model` | Modèle OpenAI à utiliser (ex: `gpt-4o`) |
+| `model_generation` | Modèle IA pour la génération de fiches (ex: `gpt-5.4`, `claude-sonnet-4-20250514`) |
+| `model_analysis` | Modèle IA pour l'analyse des avis |
+| `model_plan` | Modèle IA pour la génération du plan |
+| `openai_model` | (legacy) Fallback si les modèles par étape ne sont pas configurés |
 | `prompt_generation` | Prompt pour générer les fiches produits |
 | `prompt_analysis` | Prompt pour analyser les avis |
 | `prompt_criteres` | Prompt Perplexity pour générer les critères (placeholder `#MotClesprincipal`) |
 | `prompt_plan` | Prompt génération du plan global — placeholders : `#NomMedia`, `#MotClePrincipal`, `#NombreMots`, `#Criteres`, `#ResumeProduits`, `#MotsCles` |
-| `serpmantics_api_key` | Clé API Serpmantics (saisie depuis /parametres) |
+| `openai_api_key` | Clé API OpenAI (saisie depuis /parametres > Clés API) |
+| `anthropic_api_key` | Clé API Anthropic (saisie depuis /parametres > Clés API) |
+| `apify_api_token` | Clé API Apify (saisie depuis /parametres > Clés API) |
+| `serpmantics_api_key` | Clé API Serpmantics (saisie depuis /parametres > Clés API) |
 
 ---
 
 ## Variables d'environnement (.env)
 ```
 DATABASE_URL="file:./dev.db"
-OPENAI_API_KEY="sk-..."
-APIFY_API_TOKEN="apify_api_..."
-SERPMANTICS_API_KEY=""   ← fallback si pas configurée en DB
+OPENAI_API_KEY="sk-..."          ← fallback si pas configurée en DB
+ANTHROPIC_API_KEY="sk-ant-..."   ← fallback si pas configurée en DB
+APIFY_API_TOKEN="apify_api_..."  ← fallback si pas configurée en DB
+SERPMANTICS_API_KEY=""            ← fallback si pas configurée en DB
 ```
 
-> La clé Serpmantics est prioritairement lue depuis AppConfig (DB), sinon depuis .env.
+> Toutes les clés API sont prioritairement lues depuis AppConfig (DB), sinon depuis .env.
 
 ---
 
@@ -155,13 +165,13 @@ La création d'un guide se fait en 5 étapes enchaînées naturellement :
 - Saisir ASINs dans un **Textarea** (un par ligne, ou séparés par espace/virgule) → `POST /api/guides/[id]/products`
 - Crée des ProductIntelligence placeholders + GuideProducts
 - Bouton "Lancer la récupération" → `POST /api/guides/[id]/scrape` → polling toutes les 3s
-- Scraping Apify + analyse OpenAI → status `products-ready`
+- Scraping Apify + analyse IA (modèle `model_analysis`) → status `products-ready`
 
 ### Étape 3 — Générer le plan (Tab Plan)
 - Saisir/modifier les critères de sélection des produits (textarea éditable + bouton "Générer via Perplexity")
 - Sauvegarder les critères via `PATCH /api/guides/[id]`
 - Bouton "Générer le plan (IA)" → `POST /api/guides/[id]/plan` → polling toutes les 3s
-- OpenAI génère le plan avec les résumés produits + mots-clés + critères
+- IA génère le plan (modèle `model_plan`) avec les résumés produits + mots-clés + critères
 - Résultat dans `guide.planHtml` → affiché dans RichEditor (éditable)
 
 ### Étape 4 — Générer l'article (Tab Article)
@@ -237,7 +247,7 @@ Au submit du formulaire de création :
 | `/medias` | Profils éditoriaux (ton, style, template) |
 | `/produits` | Produits scrappés |
 | `/intelligence` | Analyses IA structurées |
-| `/parametres` | Config runtime : clés API, modèle OpenAI, prompts |
+| `/parametres` | Config runtime : 2 onglets — Prompts (modèle IA par étape + prompts éditables) et Clés API (OpenAI, Anthropic, Apify, Serpmantics) |
 
 ---
 
@@ -317,7 +327,7 @@ Le prompt est résolu dans cet ordre de priorité :
 
 **`#ResumeProduits`** injecte pour chaque produit : nom, marque, prix, URL Amazon (`https://www.amazon.fr/dp/[ASIN]`), résumé de positionnement.
 
-La réponse OpenAI est nettoyée des balises markdown (` ```html ` / ` ``` `) avant sauvegarde.
+La réponse IA est nettoyée des balises markdown (` ```html ` / ` ``` `) avant sauvegarde.
 
 ---
 
@@ -397,3 +407,10 @@ Champs **retirés de l'UI** (restent en DB, non utilisés) : `dontRules`, `produ
 | 2026-03-18 | Mots-clés Serpmantics triés par importance (`to` décroissant) à l'extraction et à l'affichage |
 | 2026-03-18 | Bouton "Supprimer" guide activé avec AlertDialog de confirmation + redirection vers `/guides` |
 | 2026-03-18 | Bouton "Ajouter des produits" dans Tab Overview (visible tant que produits pas "done") |
+| 2026-03-18 | Clés API éditables depuis /parametres > Clés API (OpenAI, Anthropic, Apify, Serpmantics) — DB prioritaire, .env en fallback |
+| 2026-03-18 | Clients `getOpenAIClient()`, `getApifyClient()`, `getAnthropicClient()` lisent la clé depuis DB puis .env |
+| 2026-03-18 | Client IA unifié `ai-client.ts` — `chatCompletion()` / `chatCompletionStream()` routent vers OpenAI ou Anthropic selon le modèle |
+| 2026-03-18 | Modèle IA configurable par étape : `model_generation`, `model_analysis`, `model_plan` (avec fallback `openai_model`) |
+| 2026-03-18 | Page Paramètres refactorisée en 2 onglets : Prompts (avec sélecteur modèle par prompt) et Clés API |
+| 2026-03-18 | Modèles disponibles : OpenAI (GPT-5.4, GPT-5 Mini), Anthropic (Claude Sonnet 4, Opus 4, Haiku 4) |
+| 2026-03-18 | Ordre des prompts : Critères Perplexity > Analyse > Generation > Plan |

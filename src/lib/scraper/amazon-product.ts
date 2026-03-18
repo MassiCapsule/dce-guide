@@ -1,4 +1,4 @@
-import { apifyClient } from "@/lib/apify";
+import { getApifyClient } from "@/lib/apify";
 
 export interface AmazonProductData {
   title: string;
@@ -47,6 +47,7 @@ export function mapRawProduct(item: any): AmazonProductData {
 }
 
 export async function scrapeAmazonProduct(asin: string): Promise<ScrapeProductResult> {
+  const apifyClient = await getApifyClient();
   const run = await apifyClient.actor("junglee/amazon-crawler").call({
     categoryOrProductUrls: [{ url: `https://www.amazon.fr/dp/${asin}` }],
     maxItemsPerStartUrl: 1,

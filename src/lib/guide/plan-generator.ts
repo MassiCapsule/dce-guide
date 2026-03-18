@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { openai } from "@/lib/openai";
+import { chatCompletion } from "@/lib/ai-client";
 import { getConfigModel } from "@/lib/config";
 import { calculateCost } from "@/lib/pricing";
 
@@ -128,7 +128,7 @@ export async function generatePlan(guideId: string): Promise<void> {
 
     if (!guide) throw new Error("Guide introuvable");
 
-    const model = await getConfigModel();
+    const model = await getConfigModel("plan");
 
     // Priorité : prompt du média > AppConfig global > défaut
     const configPrompt = await prisma.appConfig.findUnique({ where: { key: "prompt_plan" } });
@@ -165,20 +165,14 @@ export async function generatePlan(guideId: string): Promise<void> {
       .replace(/#ResumeProduits/g, resumeProduits || "Aucun produit")
       .replace(/#MotsCles/g, motsCles || "Aucun mot-clé");
 
-    const completion = await openai.chat.completions.create({
-      model,
-      messages: [
-        { role: "system", content: prompt },
-        { role: "user", content: "Génère le plan du guide d'achat." },
-      ],
-      temperature: 0.7,
-      max_tokens: 8192,
-    });
+    const completion = await chatCompletion(model, [
+      { role: "system", content: prompt },
+      { role: "user", content: "Génère le plan du guide d'achat." },
+    ], { temperature: 0.7, maxTokens: 8192 });
 
-    const raw = completion.choices[0]?.message?.content || "";
-    const planHtml = raw.replace(/^```html\s*/i, "").replace(/\s*```$/, "").trim();
-    const promptTokens = completion.usage?.prompt_tokens || 0;
-    const completionTokens = completion.usage?.completion_tokens || 0;
+    const planHtml = completion.content.replace(/^```html\s*/i, "").replace(/\s*```$/, "").trim();
+    const promptTokens = completion.promptTokens;
+    const completionTokens = completion.completionTokens;
     const cost = calculateCost(model, promptTokens, completionTokens);
 
     await prisma.guide.update({

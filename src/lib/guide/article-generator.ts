@@ -55,7 +55,7 @@ export async function generateArticle(guideId: string): Promise<void> {
     if (!guide) throw new Error("Guide introuvable");
     if (!guide.planHtml) throw new Error("Le plan doit être généré avant l'article");
 
-    const model = await getConfigModel();
+    const model = await getConfigModel("generation");
     let totalCost = guide.totalCost;
 
     // --- DISTRIBUTION MOTS-CLÉS ---
@@ -121,9 +121,8 @@ export async function generateArticle(guideId: string): Promise<void> {
       const { stream, getUsage } = await generateStream(prompt, model);
 
       let fullContent = "";
-      for await (const chunk of stream) {
-        const text = chunk.choices[0]?.delta?.content || "";
-        if (text) fullContent += text;
+      for await (const text of stream) {
+        fullContent += text;
       }
 
       const usage = getUsage();

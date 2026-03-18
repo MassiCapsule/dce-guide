@@ -1,4 +1,4 @@
-import { apifyClient } from "@/lib/apify";
+import { getApifyClient } from "@/lib/apify";
 
 export interface AmazonReview {
   title: string;
@@ -30,6 +30,7 @@ export function mapRawReviews(items: any[]): AmazonReview[] {
 }
 
 export async function scrapeAmazonReviews(asin: string, maxReviews = 100): Promise<ScrapeReviewsResult> {
+  const apifyClient = await getApifyClient();
   const run = await apifyClient.actor("junglee/amazon-reviews-scraper").call({
     productUrls: [{ url: `https://www.amazon.fr/dp/${asin}` }],
     maxReviews,

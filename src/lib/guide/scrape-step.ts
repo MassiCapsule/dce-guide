@@ -21,7 +21,7 @@ export async function executeScrapeAndAnalyze(guideId: string): Promise<void> {
 
     if (!guide) throw new Error("Guide introuvable");
 
-    const model = await getConfigModel();
+    const model = await getConfigModel("analysis");
     let totalCost = 0;
 
     // --- SCRAPING ---
