@@ -48,7 +48,7 @@ Générateur de guides d'achat SEO avec fiches produits Amazon.
 |---------|------|
 | `src/components/guides/guide-form.tsx` | Formulaire création guides (keyword + media uniquement) — sans critères, sans ASINs |
 | `src/app/parametres/page.tsx` | Page config : 2 onglets (Prompts, Clés API). Prompts avec modèle IA par étape (Critères Perplexity, Analyse, Generation) |
-| `src/app/playground/page.tsx` | Playground : test prompt fiche produit avec badges variables, édition, génération |
+| `src/app/playground/page.tsx` | Playground : test prompt fiche produit avec badges variables, édition, génération, humanisation V2 |
 | `src/components/editor/rich-editor.tsx` | Éditeur WYSIWYG TipTap v3 (H1/H2/H3, gras, listes, tableau) |
 | `src/components/editor/seo-score-bar.tsx` | Barre score SEO Serpmantics + pills mots-clés |
 | `src/components/editor/meta-fields.tsx` | Champs méta : slug, meta title, meta desc, légende image |
@@ -79,10 +79,11 @@ Générateur de guides d'achat SEO avec fiches produits Amazon.
 | `/api/medias` | GET/POST | CRUD medias éditoriaux |
 | `/api/config` | GET/POST | Lire/écrire AppConfig (DB) |
 | `/api/config/keys` | GET | Afficher les clés API masquées |
-| `/api/config/prompts` | GET | Prompts par défaut (analysis, generation, criteres) |
+| `/api/config/prompts` | GET | Prompts par défaut (analysis, generation, criteres, humaniser) |
 | `/api/serpmantics/guide` | POST | Créer guide Serpmantics (avec `group: DCE-{NomMedia}-API`) + polling + extraction mots-clés triés par importance + wordCount + serpanticsGuideId |
 | `/api/playground/build-prompt` | POST | Construit le prompt de génération annoté (segments avec badges variables) depuis AppConfig |
 | `/api/playground/generate` | POST | Envoie un prompt au modèle IA choisi, retourne le HTML généré |
+| `/api/playground/build-humanize-prompt` | POST | Construit le prompt d'humanisation (résout placeholders média + injecte HTML V1) |
 
 ### Lib / Services
 | Fichier | Rôle |
@@ -142,6 +143,7 @@ Générateur de guides d'achat SEO avec fiches produits Amazon.
 | `prompt_generation` | Prompt template pour générer les fiches produits — placeholders : `{media.name}`, `{media.toneDescription}`, `{media.writingStyle}`, `{doRules}`, `{dontRules}`, `{forbiddenWords}`, `{intelligence.productTitle}`, `{intelligence.shortTitle}`, `{intelligence.productBrand}`, `{intelligence.productPrice}`, `{intelligence.asin}`, `{intelligence.positioningSummary}`, `{intelligence.keyFeatures}`, `{intelligence.detectedUsages}`, `{intelligence.buyerProfiles}`, `{intelligence.strengthPoints}`, `{intelligence.weaknessPoints}`, `{intelligence.recurringProblems}`, `{intelligence.remarkableQuotes}`, `{keyword}`, `{wordCount}`, `{planSection}` |
 | `prompt_analysis` | Prompt template pour analyser les avis — placeholders : `{title}`, `{brand}`, `{price}`, `{rating}`, `{reviewCount}`, `{description}`, `{features}`, `{count}`, `{reviews}`. Sections `**System**` et `**User**` détectées automatiquement |
 | `prompt_criteres` | Prompt Perplexity pour générer les critères (placeholder `#MotClesprincipal`) |
+| `prompt_humaniser` | Prompt template pour humaniser les fiches produits — placeholders : `{media.toneDescription}`, `{media.writingStyle}`, `{{fiche_produit_v1}}` |
 | `openai_api_key` | Clé API OpenAI (saisie depuis /parametres > Clés API) |
 | `anthropic_api_key` | Clé API Anthropic (saisie depuis /parametres > Clés API) |
 | `apify_api_token` | Clé API Apify (saisie depuis /parametres > Clés API) |
@@ -260,8 +262,8 @@ Au submit du formulaire de création :
 | `/medias` | Profils éditoriaux (ton, style, template) |
 | `/produits` | Produits scrappés |
 | `/intelligence` | Analyses IA structurées |
-| `/playground` | Playground : tester le prompt de génération fiche produit (charger, visualiser avec badges, éditer, générer) |
-| `/parametres` | Config runtime : 2 onglets — Prompts (Critères Perplexity, Analyse, Generation + modèle IA par étape) et Clés API (OpenAI, Anthropic, Apify, Serpmantics) |
+| `/playground` | Playground : tester le prompt fiche produit (V1 génération + bouton Humaniser + prompt éditable + V2 humanisée) |
+| `/parametres` | Config runtime : 2 onglets — Prompts (Critères Perplexity, Analyse, Generation, Humaniser + modèle IA par étape) et Clés API (OpenAI, Anthropic, Apify, Serpmantics) |
 
 ---
 
@@ -465,4 +467,7 @@ Champs **retirés de l'UI média** (restent en DB) : `productStructureTemplate`
 | 2026-03-18 | Formulaire média : badges `{placeholder}` affichés à côté de chaque label pour indiquer la variable prompt |
 | 2026-03-18 | Prompt plan supprimé des Paramètres — désormais uniquement sur le média (`media.promptPlan`) |
 | 2026-03-18 | Onglet "Plan" retiré de la page Paramètres (reste : Critères Perplexity, Analyse, Generation) |
+| 2026-03-18 | Playground : bouton "Humaniser" dans Résultat V1, section Prompt Humaniser éditable, section Résultat V2 |
+| 2026-03-18 | Route `POST /api/playground/build-humanize-prompt` — résout placeholders média + injecte HTML V1 |
+| 2026-03-18 | Sous-onglet "Humaniser" ajouté dans Paramètres > Prompts (clé `prompt_humaniser`) |
 | 2026-03-18 | Helper `bullet()` dans prompt builders — évite le double tiret quand les règles commencent déjà par `- ` |

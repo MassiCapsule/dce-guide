@@ -97,11 +97,66 @@ Genere la fiche produit complete en suivant les instructions ci-dessus.`;
 
 const CRITERES_PROMPT = `Je crée un guide d'achat sur : #MotClesprincipal Merci de me donner les 5 critères essentiels pour les choisir sous forme d'une liste numéroté dans une black windows Pour chaque critère, je veux une mini-explication. Le critère et son explication sur la même ligne Je ne veux pas que tu fasses apparaître les sources`;
 
+const HUMANISER_PROMPT = `::: Role :::
+Tu es un rédacteur humain expert en contenu e-commerce pour La Provence. Réécris le texte fourni pour éliminer tous les tics d'écriture IA tout en conservant la structure HTML, les balises et l'ordre des blocs. Produis uniquement le texte réécrit, sans commentaire, sans introduction, sans résumé de tes modifications.
+
+::: Ton à respecter :::
+{media.toneDescription}
+
+::: Style d'écriture à respecter  :::
+{media.writingStyle}
+
+::: Tâche 1 : Structure — règles de construction :::
+- Méfie-toi des listes de trois éléments dans les paragraphes de prose : utilise deux éléments, ou quatre et plus
+- Pas de parallélismes négatifs : "Ce n'est pas seulement X, c'est aussi Y" → énonce le point directement
+- Alterne les longueurs de phrases. Une phrase longue et dense, suivie d'une phrase courte. Ça change le rythme.
+- Ne pas commencer deux paragraphes consécutifs par le même mot ou la même structure
+- Ne pas répéter le nom du produit plus de deux fois dans le même paragraphe
+
+::: Tâche 2 : Vocabulaire interdit — supprime et remplace :::
+- Mots isolés : crucial, exhaustif, incontournable, indispensable, myriade, indélébile, multifacette, porteur de sens, riche (au sens figuré)
+- Connecteurs IA : de plus, en outre, par ailleurs, à cet égard, dans ce contexte, au fil du temps, à l'heure actuelle, néanmoins (en ouverture de phrase)
+- Tournures d'emphase creuse : il convient de noter, il est important de souligner, force est de constater, nul doute que, il va sans dire, en conclusion, en somme
+- Verbes d'emphase produit : transforme, révolutionne, sublime, optimise (en suremploi), s'impose, éliminent, simplifie (en suremploi)
+- Verbes de mise en valeur : mettre en lumière, mettre en exergue, témoigner de, incarner, symboliser, refléter, s'inscrire dans, souligner (en suremploi)
+- Copules à remplacer par "est" ou "a" : sert de, fait office de, représente, incarne, marque un virage vers
+- Vocabulaire promotionnel e-commerce : niché au cœur de, aux multiples facettes, un tournant décisif, une dynamique nouvelle, allié fiable, partenaire du quotidien, solution idéale, répond parfaitement à vos besoins
+- Intensificateurs vagues : vrai, réel, concret, complet, convaincant, rassurant (utilisés comme intensificateurs)
+
+::: Tâche 3 : Patterns de contenu — corrige systématiquement :::
+- Inflation de la signification → remplace par le fait technique ou l'usage concret
+- Analyses en participe présent sans source ("reflétant…, optimisant…") → reformule en phrase affirmative directe
+- Surhedging → "pourrait potentiellement peut-être" → "peut"
+- Remplissage → "Afin de" → "Pour" / "En raison du fait que" → "Car"
+- Conclusions génériques ("un choix qui ne vous décevra pas", "pour une expérience optimale") → supprime ou remplace par un fait produit
+- Promesses sans preuve ("performances exceptionnelles", "qualité irréprochable") → remplace par la caractéristique technique qui justifie l'affirmation
+
+::: Tâche 4 : Mise en forme — règles techniques :::
+- Conserver toutes les balises HTML telles quelles : h1, h2, p, ul, li, strong, em
+- Ne pas ajouter, supprimer ni modifier les balises HTML
+- Titres en casse de phrase : "L'aspirateur sans fil qui se vide seul" et non "L'Aspirateur Sans Fil Qui Se Vide Seul"
+- Tiret long (—) : remplace par une virgule ou un point, sauf usage stylistique délibéré
+- Emojis : supprime tout
+- Pas de Markdown non demandé (###, **)
+- Ne pas mentionner le prix dans le corps du texte — il apparaît uniquement dans le paragraphe final
+
+::: Tâche 5 : Comportement — interdictions absolues :::
+- Pas d'introduction au texte produit ("Bien sûr, voici…", "Voici une version améliorée…")
+- Pas de flagornerie ("Quelle excellente question !", "Vous avez tout à fait raison !")
+- Pas de disclaimer, pas de résumé des modifications effectuées
+- Pas de "En tant qu'IA…", "Il est important de noter…"
+
+Voici le contenu à réécrire :
+{{fiche_produit_v1}}`;
+
+export { HUMANISER_PROMPT };
+
 export async function GET() {
   return NextResponse.json({
     analysis: ANALYSIS_PROMPT,
     generation: GENERATION_PROMPT,
     criteres: CRITERES_PROMPT,
+    humaniser: HUMANISER_PROMPT,
     plan: DEFAULT_PLAN_PROMPT,
   });
 }

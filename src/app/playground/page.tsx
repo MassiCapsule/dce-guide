@@ -67,6 +67,15 @@ export default function PlaygroundPage() {
   const [loadingGenerate, setLoadingGenerate] = useState(false);
   const [error, setError] = useState("");
 
+  // Humanisation
+  const [humanizePrompt, setHumanizePrompt] = useState("");
+  const [editableHumanizePrompt, setEditableHumanizePrompt] = useState("");
+  const [humanizeEditMode, setHumanizeEditMode] = useState(false);
+  const [loadingHumanizePrompt, setLoadingHumanizePrompt] = useState(false);
+  const [generatedHtmlV2, setGeneratedHtmlV2] = useState("");
+  const [tokenInfoV2, setTokenInfoV2] = useState<{ promptTokens: number; completionTokens: number } | null>(null);
+  const [loadingHumanize, setLoadingHumanize] = useState(false);
+
   // Load medias on mount
   useEffect(() => {
     fetch("/api/medias")
@@ -152,6 +161,60 @@ export default function PlaygroundPage() {
       setError("Erreur réseau");
     } finally {
       setLoadingGenerate(false);
+    }
+  };
+
+  const handleLoadHumanizePrompt = async () => {
+    if (!generatedHtml || !mediaId) return;
+    setLoadingHumanizePrompt(true);
+    setError("");
+    try {
+      const res = await fetch("/api/playground/build-humanize-prompt", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ htmlV1: generatedHtml, mediaId }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        setError(data.error || "Erreur");
+        return;
+      }
+      const data = await res.json();
+      setHumanizePrompt(data.prompt);
+      setEditableHumanizePrompt(data.prompt);
+      setHumanizeEditMode(false);
+    } catch {
+      setError("Erreur réseau");
+    } finally {
+      setLoadingHumanizePrompt(false);
+    }
+  };
+
+  const handleHumanize = async () => {
+    const promptToSend = humanizeEditMode ? editableHumanizePrompt : humanizePrompt;
+    if (!promptToSend.trim()) return;
+    setError("");
+    setLoadingHumanize(true);
+    setGeneratedHtmlV2("");
+    setTokenInfoV2(null);
+    try {
+      const res = await fetch("/api/playground/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt: promptToSend, model }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        setError(data.error || "Erreur de génération");
+        return;
+      }
+      const data = await res.json();
+      setGeneratedHtmlV2(data.html);
+      setTokenInfoV2({ promptTokens: data.promptTokens, completionTokens: data.completionTokens });
+    } catch {
+      setError("Erreur réseau");
+    } finally {
+      setLoadingHumanize(false);
     }
   };
 
@@ -310,12 +373,20 @@ export default function PlaygroundPage() {
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
-                <CardTitle>Résultat</CardTitle>
-                {tokenInfo && (
-                  <p className="text-xs text-muted-foreground">
-                    Tokens : {tokenInfo.promptTokens} prompt + {tokenInfo.completionTokens} completion
-                  </p>
-                )}
+                <CardTitle>Résultat V1</CardTitle>
+                <div className="flex items-center gap-3">
+                  {tokenInfo && (
+                    <p className="text-xs text-muted-foreground">
+                      Tokens : {tokenInfo.promptTokens} prompt + {tokenInfo.completionTokens} completion
+                    </p>
+                  )}
+                  {generatedHtml && !loadingGenerate && (
+                    <Button size="sm" onClick={handleLoadHumanizePrompt} disabled={loadingHumanizePrompt}>
+                      {loadingHumanizePrompt && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                      Humaniser
+                    </Button>
+                  )}
+                </div>
               </div>
             </CardHeader>
             <CardContent>
@@ -343,6 +414,93 @@ export default function PlaygroundPage() {
                   <TabsContent value="source">
                     <pre className="bg-muted p-4 rounded-lg overflow-x-auto text-sm font-mono whitespace-pre-wrap max-h-[600px] overflow-y-auto">
                       {generatedHtml}
+                    </pre>
+                  </TabsContent>
+                </Tabs>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Zone prompt humaniser */}
+        {(humanizePrompt || loadingHumanizePrompt) && (
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle>Prompt Humaniser</CardTitle>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant={humanizeEditMode ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => {
+                      if (!humanizeEditMode) setEditableHumanizePrompt(humanizePrompt);
+                      setHumanizeEditMode(!humanizeEditMode);
+                    }}
+                  >
+                    {humanizeEditMode ? "Vue brute" : "Mode édition"}
+                  </Button>
+                  <Button onClick={handleHumanize} disabled={loadingHumanize}>
+                    {loadingHumanize && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                    Lancer
+                  </Button>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {humanizeEditMode ? (
+                <Textarea
+                  value={editableHumanizePrompt}
+                  onChange={(e) => setEditableHumanizePrompt(e.target.value)}
+                  rows={30}
+                  className="font-mono text-sm"
+                />
+              ) : (
+                <pre className="whitespace-pre-wrap text-sm leading-relaxed font-mono bg-muted/30 rounded-lg p-4 max-h-[600px] overflow-y-auto">
+                  {humanizePrompt}
+                </pre>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Zone résultat V2 */}
+        {(generatedHtmlV2 || loadingHumanize) && (
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle>Résultat V2</CardTitle>
+                {tokenInfoV2 && (
+                  <p className="text-xs text-muted-foreground">
+                    Tokens : {tokenInfoV2.promptTokens} prompt + {tokenInfoV2.completionTokens} completion
+                  </p>
+                )}
+              </div>
+            </CardHeader>
+            <CardContent>
+              {loadingHumanize ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                  <span className="ml-2 text-muted-foreground">Humanisation en cours...</span>
+                </div>
+              ) : (
+                <Tabs defaultValue="preview">
+                  <TabsList>
+                    <TabsTrigger value="preview" className="flex items-center gap-1">
+                      <Eye className="w-3 h-3" /> Preview
+                    </TabsTrigger>
+                    <TabsTrigger value="source" className="flex items-center gap-1">
+                      <Code className="w-3 h-3" /> Code source
+                    </TabsTrigger>
+                  </TabsList>
+                  <TabsContent value="preview">
+                    <div
+                      className="prose prose-sm max-w-none dark:prose-invert p-4 border rounded-lg"
+                      dangerouslySetInnerHTML={{ __html: generatedHtmlV2 }}
+                    />
+                  </TabsContent>
+                  <TabsContent value="source">
+                    <pre className="bg-muted p-4 rounded-lg overflow-x-auto text-sm font-mono whitespace-pre-wrap max-h-[600px] overflow-y-auto">
+                      {generatedHtmlV2}
                     </pre>
                   </TabsContent>
                 </Tabs>

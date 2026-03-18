@@ -29,12 +29,13 @@ const MODELS = [
 const OPENAI_MODELS = MODELS.filter((m) => m.provider === "OpenAI");
 const ANTHROPIC_MODELS = MODELS.filter((m) => m.provider === "Anthropic");
 
-type PromptKey = "generation" | "analysis" | "criteres";
+type PromptKey = "generation" | "analysis" | "criteres" | "humaniser";
 
 const PROMPT_TABS: { key: PromptKey; label: string; hasModel: boolean }[] = [
   { key: "criteres", label: "Criteres Perplexity", hasModel: false },
   { key: "analysis", label: "Analyse", hasModel: true },
   { key: "generation", label: "Generation", hasModel: true },
+  { key: "humaniser", label: "Humaniser", hasModel: false },
 ];
 
 function ModelSelector({ value, onChange }: { value: string; onChange: (v: string) => void }) {
@@ -70,6 +71,7 @@ export default function ParametresPage() {
   const [generationPrompt, setGenerationPrompt] = useState("");
   const [analysisPrompt, setAnalysisPrompt] = useState("");
   const [criteresPrompt, setCriteresPrompt] = useState("");
+  const [humaniserPrompt, setHumaniserPrompt] = useState("");
   const [promptTab, setPromptTab] = useState<PromptKey>("criteres");
   const [promptSaved, setPromptSaved] = useState(false);
 
@@ -98,6 +100,7 @@ export default function ParametresPage() {
         if (data.prompt_generation) setGenerationPrompt(data.prompt_generation);
         if (data.prompt_analysis) setAnalysisPrompt(data.prompt_analysis);
         if (data.prompt_criteres) setCriteresPrompt(data.prompt_criteres);
+        if (data.prompt_humaniser) setHumaniserPrompt(data.prompt_humaniser);
         if (data.serpmantics_api_key) setSerpmanticsKey(data.serpmantics_api_key);
       });
     fetch("/api/config/keys").then((r) => r.json()).then(setKeys);
@@ -107,6 +110,7 @@ export default function ParametresPage() {
         setGenerationPrompt((prev) => prev || defaults.generation);
         setAnalysisPrompt((prev) => prev || defaults.analysis);
         setCriteresPrompt((prev) => prev || defaults.criteres);
+        setHumaniserPrompt((prev) => prev || defaults.humaniser);
       });
   }, []);
 
@@ -152,10 +156,15 @@ export default function ParametresPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ key: "prompt_criteres", value: criteresPrompt }),
       }),
+      fetch("/api/config", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ key: "prompt_humaniser", value: humaniserPrompt }),
+      }),
     ]);
     setPromptSaved(true);
     setTimeout(() => setPromptSaved(false), 2000);
-  }, [generationPrompt, analysisPrompt, criteresPrompt]);
+  }, [generationPrompt, analysisPrompt, criteresPrompt, humaniserPrompt]);
 
   const saveApiKey = async (configKey: string, value: string, setSaved: (v: boolean) => void) => {
     await fetch("/api/config", {
@@ -171,6 +180,7 @@ export default function ParametresPage() {
   const getPromptValue = (tab: PromptKey) => {
     if (tab === "generation") return generationPrompt;
     if (tab === "analysis") return analysisPrompt;
+    if (tab === "humaniser") return humaniserPrompt;
     return criteresPrompt;
   };
 
@@ -178,6 +188,7 @@ export default function ParametresPage() {
     if (tab === "generation") setGenerationPrompt(value);
     else if (tab === "analysis") setAnalysisPrompt(value);
     else if (tab === "criteres") setCriteresPrompt(value);
+    else if (tab === "humaniser") setHumaniserPrompt(value);
   };
 
   const currentTabConfig = PROMPT_TABS.find((t) => t.key === promptTab)!;
