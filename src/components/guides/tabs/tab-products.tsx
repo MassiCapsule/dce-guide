@@ -79,7 +79,7 @@ export function TabProducts({ guideId, products, onRefresh }: TabProductsProps) 
 
   useEffect(() => () => stopPolling(), []);
 
-  async function handleAddAsin() {
+  async function handleAddAndScrape() {
     const asins = asinInput
       .split(/[\s,;]+/)
       .map((a) => a.trim())
@@ -95,6 +95,9 @@ export function TabProducts({ guideId, products, onRefresh }: TabProductsProps) 
     setAsinInput("");
     setAdding(false);
     onRefresh();
+
+    // Lance le scraping automatiquement
+    handleLaunchScrape();
   }
 
   async function handleRemove(productId: string) {
@@ -158,18 +161,13 @@ export function TabProducts({ guideId, products, onRefresh }: TabProductsProps) 
           className="resize-none"
         />
         <div className="flex gap-2">
-          <Button size="sm" onClick={handleAddAsin} disabled={adding || scraping || !asinInput.trim()}>
-            {adding ? <Loader2 className="mr-2 w-4 h-4 animate-spin" /> : <Plus className="mr-2 w-4 h-4" />}
-            Ajouter les produits
-          </Button>
-          <Button size="sm" onClick={handleLaunchScrape} disabled={scraping || products.length === 0}>
-            {scraping ? (
-              <>
-                <Loader2 className="mr-2 w-3 h-3 animate-spin" />
-                En cours…
-              </>
+          <Button size="sm" onClick={handleAddAndScrape} disabled={adding || scraping || !asinInput.trim()}>
+            {adding ? (
+              <><Loader2 className="mr-2 w-4 h-4 animate-spin" />Ajout…</>
+            ) : scraping ? (
+              <><Loader2 className="mr-2 w-4 h-4 animate-spin" />En cours…</>
             ) : (
-              "Lancer la récupération"
+              <><Plus className="mr-2 w-4 h-4" />Ajouter et lancer</>
             )}
           </Button>
           {scraping && scrapeStatus && (

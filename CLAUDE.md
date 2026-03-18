@@ -48,7 +48,7 @@ Générateur de guides d'achat SEO avec fiches produits Amazon.
 | `src/components/editor/seo-score-bar.tsx` | Barre score SEO Serpmantics + pills mots-clés |
 | `src/components/editor/meta-fields.tsx` | Champs méta : slug, meta title, meta desc, légende image |
 | `src/components/guides/tabs/tab-overview.tsx` | Onglet Vue d'ensemble : infos guide, mots-clés collapsible, bouton "Ajouter des produits", progression |
-| `src/components/guides/tabs/tab-products.tsx` | Onglet Produits : ajout ASIN, suppression avec confirmation, lancer scraping + polling |
+| `src/components/guides/tabs/tab-products.tsx` | Onglet Produits : ajout ASIN + scraping auto en un clic, suppression avec confirmation, polling |
 | `src/components/intelligence/intelligence-list.tsx` | Liste produits intelligence avec suppression + confirmation |
 | `src/components/guides/tabs/tab-plan.tsx` | Onglet Plan : critères éditables (PATCH) + bouton Perplexity + bouton "Générer le plan (IA)" + polling + RichEditor |
 | `src/components/guides/tabs/tab-article.tsx` | Onglet Article : bouton "Générer l'article (IA)" + polling + RichEditor |
