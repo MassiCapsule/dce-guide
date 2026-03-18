@@ -19,13 +19,28 @@ export async function GET(_req: Request, { params }: RouteParams) {
           generatedCard: true,
         },
       },
-      keywords: true,
+      keywords: { orderBy: { id: "asc" } },
     },
   });
 
   if (!guide) {
     return NextResponse.json({ error: "Guide introuvable" }, { status: 404 });
   }
+
+  return NextResponse.json(guide);
+}
+
+export async function PATCH(req: Request, { params }: RouteParams) {
+  const { id } = await params;
+  const body = await req.json();
+  const data: Record<string, unknown> = {};
+  if (body.criteria !== undefined) data.criteria = body.criteria;
+  if (body.planHtml !== undefined) data.planHtml = body.planHtml;
+
+  const guide = await prisma.guide.update({
+    where: { id },
+    data,
+  });
 
   return NextResponse.json(guide);
 }

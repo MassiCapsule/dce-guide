@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Loader2, ChevronDown, ChevronUp } from "lucide-react";
 import { SeoScoreBar } from "@/components/editor/seo-score-bar";
 import { MetaFields } from "@/components/editor/meta-fields";
@@ -15,22 +15,28 @@ interface SeoKeyword {
 }
 
 interface TabArticleProps {
+  guideId: string;
   initialHtml: string;
   seoScore: number | null;
   seoKeywords: SeoKeyword[];
+  serpanticsUrl?: string;
   meta: {
     slug: string;
     metaTitle: string;
     metaDescription: string;
     imageCaption: string;
   };
+  onRefresh: () => void;
 }
 
 export function TabArticle({
+  guideId,
   initialHtml,
   seoScore,
   seoKeywords,
+  serpanticsUrl,
   meta: metaProp,
+  onRefresh,
 }: TabArticleProps) {
   const [html, setHtml] = useState<string>(initialHtml);
   const [meta, setMeta] = useState(metaProp);
@@ -38,32 +44,91 @@ export function TabArticle({
   const [keywords, setKeywords] = useState<SeoKeyword[]>(seoKeywords);
   const [scoreLoading, setScoreLoading] = useState<boolean>(false);
   const [generating, setGenerating] = useState<boolean>(false);
+  const [generateError, setGenerateError] = useState<string | null>(null);
   const [seoOpen, setSeoOpen] = useState<boolean>(false);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Sync if parent reloads guide data
+  useEffect(() => {
+    setHtml(initialHtml);
+  }, [initialHtml]);
+
+  function stopPolling() {
+    if (pollRef.current) {
+      clearInterval(pollRef.current);
+      pollRef.current = null;
+    }
+  }
+
+  useEffect(() => () => stopPolling(), []);
 
   const handleMetaChange = (field: string, value: string) => {
     setMeta((prev) => ({ ...prev, [field]: value }));
   };
 
   const handleRecalculate = async () => {
+    if (!html) return;
     setScoreLoading(true);
-    await new Promise((r) => setTimeout(r, 1500));
-    setScore(85);
-    setScoreLoading(false);
+    try {
+      const res = await fetch(`/api/guides/${guideId}/score`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content: html }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setScore(data.score);
+        setKeywords(data.keywords);
+      }
+    } finally {
+      setScoreLoading(false);
+    }
   };
 
-  const handleGenerate = async () => {
+  async function handleGenerate() {
     setGenerating(true);
-    await new Promise((r) => setTimeout(r, 3000));
-    setGenerating(false);
-  };
+    setGenerateError(null);
+
+    const res = await fetch(`/api/guides/${guideId}/article`, { method: "POST" });
+    if (!res.ok) {
+      const data = await res.json();
+      setGenerateError(data.error || "Erreur démarrage");
+      setGenerating(false);
+      return;
+    }
+
+    // Polling toutes les 3s
+    pollRef.current = setInterval(async () => {
+      const pollRes = await fetch(`/api/guides/${guideId}/status`);
+      if (!pollRes.ok) return;
+      const data = await pollRes.json();
+
+      if (data.status === "complete") {
+        setGenerating(false);
+        stopPolling();
+        const guideRes = await fetch(`/api/guides/${guideId}`);
+        if (guideRes.ok) {
+          const guide = await guideRes.json();
+          setHtml(guide.guideHtml || "");
+        }
+        onRefresh();
+      } else if (data.status === "error") {
+        setGenerateError(data.errorMessage || "Erreur inconnue");
+        setGenerating(false);
+        stopPolling();
+      }
+    }, 3000);
+  }
 
   return (
     <div className="space-y-4">
       <SeoScoreBar
         score={score}
         keywords={keywords}
-        onRecalculate={handleRecalculate}
+        onRecalculate={() => handleRecalculate()}
         loading={scoreLoading}
+        disabled={!html || !serpanticsUrl}
+        serpanticsUrl={serpanticsUrl}
       />
 
       {/* Collapsible Éléments SEO */}
@@ -95,12 +160,15 @@ export function TabArticle({
 
       <RichEditor content={html} onChange={setHtml} />
 
-      <div className="flex justify-end">
+      <div className="flex items-center justify-end gap-2">
+        {generateError && (
+          <span className="text-xs text-red-600">{generateError}</span>
+        )}
         <Button onClick={handleGenerate} disabled={generating}>
           {generating ? (
             <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Génération en cours...
+              Génération en cours…
             </>
           ) : (
             "Générer l'article (IA)"

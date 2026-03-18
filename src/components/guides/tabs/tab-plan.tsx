@@ -1,10 +1,12 @@
 "use client";
 
-import { useState } from "react";
-import { Loader2 } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { Loader2, ExternalLink } from "lucide-react";
 import { SeoScoreBar } from "@/components/editor/seo-score-bar";
 import { RichEditor } from "@/components/editor/rich-editor";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
 
 interface SeoKeyword {
   expression: string;
@@ -14,59 +16,231 @@ interface SeoKeyword {
 }
 
 interface TabPlanProps {
+  guideId: string;
   initialHtml: string;
+  initialCriteria: string;
+  keyword: string;
   seoScore: number | null;
   seoKeywords: SeoKeyword[];
+  serpanticsUrl?: string;
+  onRefresh: () => void;
+  onSaveCriteria: (criteria: string) => Promise<void>;
+  onTabChange: (tab: string) => void;
 }
 
-export function TabPlan({
-  initialHtml,
-  seoScore,
-  seoKeywords,
-}: TabPlanProps) {
+
+export function TabPlan({ guideId, initialHtml, initialCriteria, keyword, seoScore, seoKeywords, serpanticsUrl, onRefresh, onSaveCriteria, onTabChange }: TabPlanProps) {
   const [html, setHtml] = useState<string>(initialHtml);
+  const [criteria, setCriteria] = useState<string>(initialCriteria);
+  const [criteresPrompt, setCriteresPrompt] = useState<string>("");
+  const [savingCriteria, setSavingCriteria] = useState(false);
+  const [validating, setValidating] = useState(false);
   const [score, setScore] = useState<number | null>(seoScore);
   const [keywords, setKeywords] = useState<SeoKeyword[]>(seoKeywords);
   const [scoreLoading, setScoreLoading] = useState<boolean>(false);
+  const [scoreError, setScoreError] = useState<string | null>(null);
   const [generating, setGenerating] = useState<boolean>(false);
+  const [generateError, setGenerateError] = useState<string | null>(null);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const handleRecalculate = async () => {
+  // Sync if parent reloads guide data
+  useEffect(() => {
+    setHtml(initialHtml);
+  }, [initialHtml]);
+
+  useEffect(() => {
+    setCriteria(initialCriteria);
+  }, [initialCriteria]);
+
+  useEffect(() => {
+    fetch("/api/config")
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.prompt_criteres) {
+          setCriteresPrompt(data.prompt_criteres);
+        } else {
+          fetch("/api/config/prompts")
+            .then((r) => r.json())
+            .then((defaults) => setCriteresPrompt(defaults.criteres ?? ""));
+        }
+      });
+  }, []);
+
+  const handleGenererCriteres = () => {
+    const prompt = criteresPrompt.replaceAll("#MotClesprincipal", keyword);
+    const url = `https://www.perplexity.ai/search?q=${encodeURIComponent(prompt)}`;
+    const a = document.createElement("a");
+    a.href = url;
+    a.target = "_blank";
+    a.rel = "noopener noreferrer";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  };
+
+  function stopPolling() {
+    if (pollRef.current) {
+      clearInterval(pollRef.current);
+      pollRef.current = null;
+    }
+  }
+
+  useEffect(() => () => stopPolling(), []);
+
+  const handleRecalculate = async (content?: string) => {
+    const toScore = content ?? html;
+    if (!toScore) return;
     setScoreLoading(true);
-    await new Promise((r) => setTimeout(r, 1500));
-    setScore(74);
-    setScoreLoading(false);
+    setScoreError(null);
+    try {
+      const res = await fetch(`/api/guides/${guideId}/score`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content: toScore }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setScore(data.score);
+        setKeywords(data.keywords);
+      } else {
+        setScoreError(data.error || "Erreur Serpmantics");
+      }
+    } finally {
+      setScoreLoading(false);
+    }
   };
 
-  const handleGenerate = async () => {
+  async function handleGenerate() {
     setGenerating(true);
-    await new Promise((r) => setTimeout(r, 2000));
-    setGenerating(false);
-  };
+    setGenerateError(null);
+
+    const res = await fetch(`/api/guides/${guideId}/plan`, { method: "POST" });
+    if (!res.ok) {
+      const data = await res.json();
+      setGenerateError(data.error || "Erreur démarrage");
+      setGenerating(false);
+      return;
+    }
+
+    // Polling toutes les 3s
+    pollRef.current = setInterval(async () => {
+      const pollRes = await fetch(`/api/guides/${guideId}/status`);
+      if (!pollRes.ok) return;
+      const data = await pollRes.json();
+
+      if (data.status === "plan-ready") {
+        setGenerating(false);
+        stopPolling();
+        // Fetch updated guide to get planHtml
+        const guideRes = await fetch(`/api/guides/${guideId}`);
+        if (guideRes.ok) {
+          const guide = await guideRes.json();
+          const planHtml = guide.planHtml || "";
+          setHtml(planHtml);
+          // Calcul automatique du score SEO
+          if (planHtml) handleRecalculate(planHtml);
+        }
+        onRefresh();
+      } else if (data.status === "error") {
+        setGenerateError(data.errorMessage || "Erreur inconnue");
+        setGenerating(false);
+        stopPolling();
+      }
+    }, 3000);
+  }
 
   return (
     <div className="space-y-4">
+      {/* Critères de sélection des produits */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Critères de sélection des produits</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div>
+            <Label htmlFor="criteria">Critères</Label>
+            <textarea
+              id="criteria"
+              value={criteria}
+              onChange={(e) => setCriteria(e.target.value)}
+              placeholder="Ex: 1. Autonomie — Privilégiez plus de 40 min..."
+              className="mt-1 w-full min-h-[120px] text-sm bg-muted p-3 rounded-md font-sans leading-relaxed resize-y border border-input focus:outline-none focus:ring-2 focus:ring-ring"
+            />
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handleGenererCriteres}
+            >
+              <ExternalLink className="mr-2 h-3 w-3" />
+              Générer via Perplexity
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={savingCriteria}
+              onClick={async () => {
+                setSavingCriteria(true);
+                await onSaveCriteria(criteria);
+                setSavingCriteria(false);
+              }}
+            >
+              {savingCriteria ? "Sauvegarde…" : "Sauvegarder"}
+            </Button>
+            <div className="flex items-center gap-2 ml-auto">
+              {generateError && (
+                <span className="text-xs text-red-600">{generateError}</span>
+              )}
+              <Button onClick={handleGenerate} disabled={generating}>
+                {generating ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Génération en cours…
+                  </>
+                ) : (
+                  "Générer le plan (IA)"
+                )}
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       <SeoScoreBar
         score={score}
         keywords={keywords}
-        onRecalculate={handleRecalculate}
+        onRecalculate={() => handleRecalculate()}
+
         loading={scoreLoading}
+        disabled={!html || !serpanticsUrl}
+        serpanticsUrl={serpanticsUrl}
       />
+      {scoreError && (
+        <p className="text-xs text-red-600">{scoreError}</p>
+      )}
 
       <RichEditor content={html} onChange={setHtml} />
 
-      <div className="flex justify-end gap-2">
-        <Button variant="outline" onClick={handleGenerate} disabled={generating}>
-          {generating ? (
-            <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Génération en cours...
-            </>
-          ) : (
-            "Générer le plan (IA)"
-          )}
+      <div className="flex items-center justify-end gap-2">
+        <Button
+          disabled={!html || validating}
+          onClick={async () => {
+            setValidating(true);
+            await fetch(`/api/guides/${guideId}`, {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ planHtml: html }),
+            });
+            onRefresh();
+            setValidating(false);
+            onTabChange("article");
+          }}
+        >
+          {validating ? "Sauvegarde…" : "Valider le plan →"}
         </Button>
-
-        <Button>Valider le plan →</Button>
       </div>
     </div>
   );

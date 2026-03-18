@@ -15,59 +15,23 @@ export async function GET() {
 
 export async function POST(req: Request) {
   try {
-    const { title, mediaId, products, keywords } = await req.json();
+    const { title, mediaId, keywords, criteria, wordCountMin, wordCountMax, serpanticsGuideId } = await req.json();
 
-    if (!title || !mediaId || !products?.length || !keywords?.length) {
+    if (!title || !mediaId || !keywords?.length) {
       return NextResponse.json(
-        { error: "title, mediaId, products et keywords sont requis" },
+        { error: "title, mediaId et keywords sont requis" },
         { status: 400 }
       );
     }
 
-    if (products.length < 2 || products.length > 10) {
-      return NextResponse.json(
-        { error: "Un guide doit contenir entre 2 et 10 produits" },
-        { status: 400 }
-      );
-    }
-
-    // For each ASIN, find or create a ProductIntelligence placeholder
-    const productLinks: { intelligenceId: string; position: number }[] = [];
-
-    for (let i = 0; i < products.length; i++) {
-      const asin = products[i].asin?.trim();
-      if (!asin) {
-        return NextResponse.json(
-          { error: `EAN manquant pour le produit ${i + 1}` },
-          { status: 400 }
-        );
-      }
-
-      // Find existing or create placeholder
-      let intelligence = await prisma.productIntelligence.findUnique({
-        where: { asin_marketplace: { asin, marketplace: "amazon.fr" } },
-      });
-
-      if (!intelligence) {
-        intelligence = await prisma.productIntelligence.create({
-          data: { asin, marketplace: "amazon.fr" },
-        });
-      }
-
-      productLinks.push({ intelligenceId: intelligence.id, position: i + 1 });
-    }
-
-    // Create the guide with products and keywords
     const guide = await prisma.guide.create({
       data: {
         title,
         mediaId,
-        products: {
-          create: productLinks.map((p) => ({
-            position: p.position,
-            intelligenceId: p.intelligenceId,
-          })),
-        },
+        criteria: criteria ?? "",
+        wordCountMin: wordCountMin ?? 0,
+        wordCountMax: wordCountMax ?? 0,
+        serpanticsGuideId: serpanticsGuideId ?? "",
         keywords: {
           create: keywords.map((k: any) => ({
             keyword: k.keyword,
@@ -77,7 +41,6 @@ export async function POST(req: Request) {
         },
       },
       include: {
-        products: { include: { intelligence: true } },
         keywords: true,
         media: true,
       },

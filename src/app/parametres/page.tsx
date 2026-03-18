@@ -39,7 +39,9 @@ export default function ParametresPage() {
   const [saving, setSaving] = useState(false);
   const [generationPrompt, setGenerationPrompt] = useState("");
   const [analysisPrompt, setAnalysisPrompt] = useState("");
-  const [promptTab, setPromptTab] = useState<"generation" | "analysis">("generation");
+  const [criteresPrompt, setCriteresPrompt] = useState("");
+  const [planPrompt, setPlanPrompt] = useState("");
+  const [promptTab, setPromptTab] = useState<"generation" | "analysis" | "criteres" | "plan">("generation");
   const [promptSaved, setPromptSaved] = useState(false);
   const [serpmanticsKey, setSerpmanticsKey] = useState("");
   const [serpmanticsKeySaved, setSerpmanticsKeySaved] = useState(false);
@@ -51,6 +53,8 @@ export default function ParametresPage() {
         if (data.openai_model) setModel(data.openai_model);
         if (data.prompt_generation) setGenerationPrompt(data.prompt_generation);
         if (data.prompt_analysis) setAnalysisPrompt(data.prompt_analysis);
+        if (data.prompt_criteres) setCriteresPrompt(data.prompt_criteres);
+        if (data.prompt_plan) setPlanPrompt(data.prompt_plan);
         if (data.serpmantics_api_key) setSerpmanticsKey(data.serpmantics_api_key);
       });
     fetch("/api/config/keys").then((r) => r.json()).then(setKeys);
@@ -61,6 +65,8 @@ export default function ParametresPage() {
       .then((defaults) => {
         setGenerationPrompt((prev) => prev || defaults.generation);
         setAnalysisPrompt((prev) => prev || defaults.analysis);
+        setCriteresPrompt((prev) => prev || defaults.criteres);
+        setPlanPrompt((prev) => prev || defaults.plan);
       });
   }, []);
 
@@ -88,10 +94,20 @@ export default function ParametresPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ key: "prompt_analysis", value: analysisPrompt }),
       }),
+      fetch("/api/config", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ key: "prompt_criteres", value: criteresPrompt }),
+      }),
+      fetch("/api/config", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ key: "prompt_plan", value: planPrompt }),
+      }),
     ]);
     setPromptSaved(true);
     setTimeout(() => setPromptSaved(false), 2000);
-  }, [generationPrompt, analysisPrompt]);
+  }, [generationPrompt, analysisPrompt, criteresPrompt, planPrompt]);
 
   const saveSerpmanticsKey = async () => {
     await fetch("/api/config", {
@@ -258,6 +274,26 @@ export default function ParametresPage() {
                   >
                     Analyse
                   </button>
+                  <button
+                    onClick={() => setPromptTab("criteres")}
+                    className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                      promptTab === "criteres"
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-muted text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    Critères Perplexity
+                  </button>
+                  <button
+                    onClick={() => setPromptTab("plan")}
+                    className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                      promptTab === "plan"
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-muted text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    Plan
+                  </button>
                 </div>
                 {promptTab === "generation" ? (
                   <textarea
@@ -266,10 +302,24 @@ export default function ParametresPage() {
                     className="w-full h-[500px] text-xs bg-muted p-4 rounded-lg font-mono leading-relaxed resize-y border-0 focus:outline-none focus:ring-2 focus:ring-ring"
                     spellCheck={false}
                   />
-                ) : (
+                ) : promptTab === "analysis" ? (
                   <textarea
                     value={analysisPrompt}
                     onChange={(e) => setAnalysisPrompt(e.target.value)}
+                    className="w-full h-[500px] text-xs bg-muted p-4 rounded-lg font-mono leading-relaxed resize-y border-0 focus:outline-none focus:ring-2 focus:ring-ring"
+                    spellCheck={false}
+                  />
+                ) : promptTab === "criteres" ? (
+                  <textarea
+                    value={criteresPrompt}
+                    onChange={(e) => setCriteresPrompt(e.target.value)}
+                    className="w-full h-[500px] text-xs bg-muted p-4 rounded-lg font-mono leading-relaxed resize-y border-0 focus:outline-none focus:ring-2 focus:ring-ring"
+                    spellCheck={false}
+                  />
+                ) : (
+                  <textarea
+                    value={planPrompt}
+                    onChange={(e) => setPlanPrompt(e.target.value)}
                     className="w-full h-[500px] text-xs bg-muted p-4 rounded-lg font-mono leading-relaxed resize-y border-0 focus:outline-none focus:ring-2 focus:ring-ring"
                     spellCheck={false}
                   />

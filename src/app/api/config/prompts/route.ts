@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { DEFAULT_PLAN_PROMPT } from "@/lib/guide/plan-generator";
 
 const ANALYSIS_PROMPT = `## Prompt d'analyse des avis (review-analyzer)
 
@@ -93,9 +94,13 @@ const GENERATION_PROMPT = `## Prompt de generation de fiche (prompt-builder)
 **User** :
 Genere la fiche produit complete en suivant les instructions ci-dessus.`;
 
+const CRITERES_PROMPT = `Je crée un guide d'achat sur : #MotClesprincipal Merci de me donner les 5 critères essentiels pour les choisir sous forme d'une liste numéroté dans une black windows Pour chaque critère, je veux une mini-explication. Le critère et son explication sur la même ligne Je ne veux pas que tu fasses apparaître les sources`;
+
 export async function GET() {
   return NextResponse.json({
     analysis: ANALYSIS_PROMPT,
     generation: GENERATION_PROMPT,
+    criteres: CRITERES_PROMPT,
+    plan: DEFAULT_PLAN_PROMPT,
   });
 }

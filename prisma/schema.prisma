@@ -15,12 +15,14 @@ model AppConfig {
 model Media {
   id                       String   @id @default(cuid())
   name                     String
+  description              String   @default("")
   toneDescription          String
   writingStyle             String
   doRules                  String   // JSON string array
   dontRules                String   // JSON string array
   productStructureTemplate String
   defaultProductWordCount  Int      @default(800)
+  promptPlan               String   @default("")
   createdAt                DateTime @default(now())
   updatedAt                DateTime @updatedAt
 
@@ -89,6 +91,7 @@ model GeneratedProductCard {
 model Guide {
   id           String @id @default(cuid())
   title        String
+  criteria     String @default("")
   status       String @default("draft") // draft|scraping|analyzing|distributing|generating|generating-guide|complete|error
   errorMessage String @default("")
   currentStep  Int    @default(0) // Index du produit en cours (progress)
@@ -96,6 +99,11 @@ model Guide {
   mediaId String
   media   Media  @relation(fields: [mediaId], references: [id])
 
+  wordCountMin          Int    @default(0)
+  wordCountMax          Int    @default(0)
+
+  serpanticsGuideId     String @default("")
+  planHtml              String @default("")
   guideHtml             String @default("")
   guideWordCount        Int    @default(0)
   guidePromptUsed       String @default("")

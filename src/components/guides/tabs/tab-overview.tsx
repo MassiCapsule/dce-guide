@@ -1,22 +1,29 @@
 "use client";
 
 import { useState } from "react";
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
-import { CheckCircle2, Clock, Lock } from "lucide-react";
+import { CheckCircle2, ChevronDown, ChevronUp, Clock, Lock, Plus } from "lucide-react";
 
 interface StepStatus {
   status: "done" | "in_progress" | "locked";
   date: string | null;
 }
 
+interface GuideKeyword {
+  keyword: string;
+  min: number;
+  max: number;
+}
+
 interface GuideOverviewData {
   keyword: string;
-  targetWordCount: number;
+  wordCountMin: number;
+  wordCountMax: number;
   selectionCriteria: string;
+  keywords: GuideKeyword[];
   steps: {
     guide: StepStatus;
     products: StepStatus;
@@ -38,7 +45,10 @@ const STEPS = [
 ] as const;
 
 export function TabOverview({ data, onTabChange }: TabOverviewProps) {
-  const [criteria, setCriteria] = useState(data.selectionCriteria);
+  const [keywordsOpen, setKeywordsOpen] = useState(false);
+
+  const avgWordCount = Math.round(((data.wordCountMin + data.wordCountMax) / 2) / 100) * 100;
+  const recommendedProducts = data.wordCountMin > 0 ? Math.ceil(avgWordCount / 300) : null;
 
   return (
     <div className="max-w-2xl space-y-4">
@@ -52,38 +62,70 @@ export function TabOverview({ data, onTabChange }: TabOverviewProps) {
             <span>Mot-clé principal</span>
             <span className="font-medium">{data.keyword}</span>
           </div>
-          <div className="flex justify-between text-sm">
-            <span>Nombre de mots cible</span>
-            <span className="font-medium">
-              {data.targetWordCount.toLocaleString()} mots
-            </span>
-          </div>
+          {data.wordCountMin > 0 && (
+            <>
+              <div className="flex justify-between text-sm">
+                <span>Nb mots min / max</span>
+                <span className="font-medium">
+                  {data.wordCountMin.toLocaleString()} / {data.wordCountMax.toLocaleString()}
+                </span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span>Moyenne cible</span>
+                <span className="font-medium">{avgWordCount.toLocaleString()} mots</span>
+              </div>
+              {recommendedProducts !== null && (
+                <div className="flex justify-between text-sm">
+                  <span>Produits recommandés</span>
+                  <span className="font-medium">{recommendedProducts}</span>
+                </div>
+              )}
+            </>
+          )}
+          {data.keywords.length > 0 && (
+            <>
+              <button
+                className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground pt-1"
+                onClick={() => setKeywordsOpen((v) => !v)}
+              >
+                {keywordsOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                {keywordsOpen ? "Masquer la liste" : "Voir la liste des mots-clés"}
+              </button>
+              {keywordsOpen && (
+                <div className="mt-2 rounded-md border text-xs overflow-hidden">
+                  <div className="grid grid-cols-3 bg-muted px-3 py-1.5 font-medium text-muted-foreground">
+                    <span>Mot-clé</span>
+                    <span className="text-right">Min</span>
+                    <span className="text-right">Max</span>
+                  </div>
+                  <div className="max-h-56 overflow-y-auto divide-y">
+                    {data.keywords.map((k) => (
+                      <div key={k.keyword} className="grid grid-cols-3 px-3 py-1.5">
+                        <span className="truncate">{k.keyword}</span>
+                        <span className="text-right text-muted-foreground">{k.min}</span>
+                        <span className="text-right text-muted-foreground">{k.max}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </>
+          )}
         </CardContent>
       </Card>
 
-      {/* Card 2 — Critères de sélection des produits */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Critères de sélection des produits</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <div className="space-y-1">
-            <Label htmlFor="criteria">Critères</Label>
-            <Textarea
-              id="criteria"
-              rows={3}
-              className="text-sm"
-              value={criteria}
-              onChange={(e) => setCriteria(e.target.value)}
-            />
-          </div>
-          <Button size="sm" variant="outline">
-            Sauvegarder
-          </Button>
-        </CardContent>
-      </Card>
+      {/* Bouton raccourci vers l'onglet Produits */}
+      {data.steps.products.status !== "done" && (
+        <Button
+          className="w-full"
+          onClick={() => onTabChange("products")}
+        >
+          <Plus className="mr-2 h-4 w-4" />
+          Ajouter des produits
+        </Button>
+      )}
 
-      {/* Card 3 — Progression */}
+      {/* Card 2 — Progression */}
       <Card>
         <CardHeader>
           <CardTitle>Progression</CardTitle>

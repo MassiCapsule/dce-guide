@@ -18,12 +18,14 @@ interface MediaFormProps {
   media?: {
     id: string;
     name: string;
+    description: string;
     toneDescription: string;
     writingStyle: string;
     doRules: string;
     dontRules: string;
     productStructureTemplate: string;
     defaultProductWordCount: number;
+    promptPlan: string;
   };
 }
 
@@ -33,6 +35,7 @@ export function MediaForm({ media }: MediaFormProps) {
   const isEditing = !!media;
 
   const [name, setName] = useState(media?.name ?? "");
+  const [description, setDescription] = useState(media?.description ?? "");
   const [toneDescription, setToneDescription] = useState(
     media?.toneDescription ?? ""
   );
@@ -59,6 +62,7 @@ export function MediaForm({ media }: MediaFormProps) {
   const [defaultProductWordCount, setDefaultProductWordCount] = useState(
     media?.defaultProductWordCount ?? 800
   );
+  const [promptPlan, setPromptPlan] = useState(media?.promptPlan ?? "");
   const [submitting, setSubmitting] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -77,12 +81,14 @@ export function MediaForm({ media }: MediaFormProps) {
 
       const body = {
         name,
+        description,
         toneDescription,
         writingStyle,
         doRules: JSON.stringify(doRulesArray),
         dontRules: JSON.stringify(dontRulesArray),
         productStructureTemplate,
         defaultProductWordCount,
+        promptPlan,
       };
 
       const url = isEditing ? `/api/medias/${media.id}` : "/api/medias";
@@ -138,6 +144,17 @@ export function MediaForm({ media }: MediaFormProps) {
           </div>
 
           <div className="space-y-2">
+            <Label htmlFor="description">Description</Label>
+            <Textarea
+              id="description"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Décrivez ce média en quelques mots..."
+              rows={2}
+            />
+          </div>
+
+          <div className="space-y-2">
             <Label htmlFor="toneDescription">Description du ton</Label>
             <Textarea
               id="toneDescription"
@@ -188,20 +205,6 @@ export function MediaForm({ media }: MediaFormProps) {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="productStructureTemplate">
-              Template de structure produit
-            </Label>
-            <Textarea
-              id="productStructureTemplate"
-              value={productStructureTemplate}
-              onChange={(e) => setProductStructureTemplate(e.target.value)}
-              placeholder="Structure HTML du template..."
-              rows={10}
-              className="font-mono text-sm"
-            />
-          </div>
-
-          <div className="space-y-2">
             <Label htmlFor="defaultProductWordCount">
               Nombre de mots par defaut
             </Label>
@@ -215,6 +218,21 @@ export function MediaForm({ media }: MediaFormProps) {
               min={100}
               max={5000}
             />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="promptPlan">Prompt génération du plan (spécifique à ce média)</Label>
+            <Textarea
+              id="promptPlan"
+              value={promptPlan}
+              onChange={(e) => setPromptPlan(e.target.value)}
+              placeholder="Laissez vide pour utiliser le prompt global (Paramètres). Placeholders disponibles : #NomMedia, #MotClePrincipal, #NombreMots, #Criteres, #ResumeProduits, #MotsCles"
+              rows={12}
+              className="font-mono text-sm"
+            />
+            <p className="text-xs text-muted-foreground">
+              Si renseigné, ce prompt remplace le prompt global pour tous les guides de ce média.
+            </p>
           </div>
 
           <div className="flex gap-4">

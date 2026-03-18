@@ -1,106 +1,204 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Trash2 } from "lucide-react";
 import { Header } from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { TabOverview } from "@/components/guides/tabs/tab-overview";
 import { TabProducts } from "@/components/guides/tabs/tab-products";
 import { TabPlan } from "@/components/guides/tabs/tab-plan";
 import { TabArticle } from "@/components/guides/tabs/tab-article";
 
-// --- Fixture data (UX development — no real API calls) ---
-const guideFixture = {
-  keyword: "meilleurs robots aspirateurs 2025",
-  targetWordCount: 4200,
-  selectionCriteria:
-    "Choisir des produits avec plus de 100 avis, compatibles parquet et carrelage, autonomie supérieure à 90 minutes.",
-  steps: {
-    guide: { status: "done" as const, date: "2026-03-11" },
-    products: { status: "done" as const, date: "2026-03-12" },
-    plan: { status: "in_progress" as const, date: null },
-    article: { status: "locked" as const, date: null },
-  },
-};
+interface GuideProduct {
+  id: string;
+  position: number;
+  intelligence: {
+    asin: string;
+    productTitle: string;
+    productBrand: string;
+    productPrice: string;
+    productImageUrl: string;
+    reviewCount: number;
+    analyzed: boolean;
+  } | null;
+}
 
-const productsFixture = [
-  {
-    id: "prod-1",
-    asin: "B09X3P4QGM",
-    title: "iRobot Roomba j7+",
-    brand: "iRobot",
-    price: "549,99 €",
-    imageUrl: "https://placehold.co/200x200?text=Roomba+j7%2B",
-    reviewCount: 2847,
-    rating: 4.4,
+interface Guide {
+  id: string;
+  title: string;
+  criteria: string;
+  status: string;
+  wordCountMin: number;
+  wordCountMax: number;
+  serpanticsGuideId: string;
+  planHtml: string;
+  guideHtml: string;
+  createdAt: string;
+  updatedAt: string;
+  products: GuideProduct[];
+  keywords: { keyword: string; minOccurrences: number; maxOccurrences: number }[];
+}
+
+function computeSteps(guide: Guide) {
+  const guideStep = {
     status: "done" as const,
-  },
-  {
-    id: "prod-2",
-    asin: "B0BW3TT41M",
-    title: "Roborock S8 Pro Ultra",
-    brand: "Roborock",
-    price: "999,99 €",
-    imageUrl: "https://placehold.co/200x200?text=Roborock+S8",
-    reviewCount: 1243,
-    rating: 4.6,
-    status: "done" as const,
-  },
-  {
-    id: "prod-3",
-    asin: "B0C5MKL8VR",
-    title: "Ecovacs Deebot X2 Omni",
-    brand: "Ecovacs",
-    price: "799,00 €",
-    imageUrl: "https://placehold.co/200x200?text=Deebot+X2",
-    reviewCount: 876,
-    rating: 4.3,
-    status: "pending" as const,
-  },
-];
+    date: new Date(guide.createdAt).toLocaleDateString("fr-FR"),
+  };
 
-const planHtml =
-  "<h2>Introduction</h2><p><strong>Brief :</strong> Présenter le sujet, accrocher le lecteur avec les critères clés de choix.</p><p><strong>Mots-clés :</strong> robot aspirateur, meilleur 2025, guide d'achat</p><p><strong>Mots cible :</strong> 300 mots</p><h2>Critères de sélection</h2><p><strong>Brief :</strong> Expliquer sur quoi on juge les produits : autonomie, puissance, navigation.</p><p><strong>Mots-clés :</strong> autonomie, puissance aspiration, cartographie, navigation laser</p><p><strong>Mots cible :</strong> 400 mots</p><h2>Produit 1 — iRobot Roomba j7+</h2><p><strong>Brief :</strong> Présenter le Roomba j7+, ses points forts (évitement d'obstacles) et ses limites.</p><p><strong>Mots-clés :</strong> iRobot, évitement obstacles, vider automatiquement</p><p><strong>Mots cible :</strong> 600 mots</p><h2>Produit 2 — Roborock S8 Pro Ultra</h2><p><strong>Brief :</strong> Présenter le S8 Pro Ultra, le meilleur polyvalent du marché.</p><p><strong>Mots-clés :</strong> Roborock, lavage, station auto-nettoyante</p><p><strong>Mots cible :</strong> 600 mots</p><h2>Produit 3 — Ecovacs Deebot X2 Omni</h2><p><strong>Brief :</strong> Présenter le Deebot X2, design carré pour les coins.</p><p><strong>Mots-clés :</strong> Ecovacs, coins, aspiration et lavage combinés</p><p><strong>Mots cible :</strong> 600 mots</p><h2>FAQ</h2><p><strong>Brief :</strong> 5 questions fréquentes des acheteurs.</p><p><strong>Mots cible :</strong> 400 mots</p><h2>Sommaire</h2><p><strong>Brief :</strong> Liste des produits avec liens internes.</p><p><strong>Mots cible :</strong> 100 mots</p>";
+  const allAnalyzed =
+    guide.products.length > 0 && guide.products.every((p) => p.intelligence?.analyzed);
+  const productsStep = {
+    status:
+      guide.products.length === 0
+        ? ("locked" as const)
+        : allAnalyzed
+        ? ("done" as const)
+        : ("in_progress" as const),
+    date: allAnalyzed ? new Date(guide.updatedAt).toLocaleDateString("fr-FR") : null,
+  };
 
-const articleHtml =
-  "<h1>Meilleurs robots aspirateurs 2025 — Comparatif &amp; Avis</h1><p>Choisir le meilleur robot aspirateur en 2025 nécessite de comparer l'autonomie, la puissance d'aspiration et les fonctionnalités avancées comme la navigation laser.</p><h2>1. iRobot Roomba j7+</h2><p>Le Roomba j7+ est le champion de l'évitement d'obstacles. Grâce à sa technologie PrecisionVision, il reconnaît et évite les câbles, chaussures et autres obstacles du quotidien.</p><ul><li>Puissance d'aspiration : 10x supérieure aux modèles standards</li><li>Autonomie : 75 minutes</li><li>Station automatique de vidage incluse</li></ul><h2>2. Roborock S8 Pro Ultra</h2><p>Le Roborock S8 Pro Ultra représente le summum de la polyvalence avec son module combiné aspiration et lavage. Sa station auto-nettoyante est la plus complète du marché.</p><ul><li>Double brosse en caoutchouc pour aspiration optimale</li><li>Système VibraRise pour le lavage</li><li>Navigation laser LiDAR de précision</li></ul><h2>3. Ecovacs Deebot X2 Omni</h2><p>Le Deebot X2 se distingue par sa forme carrée unique qui lui permet d'atteindre les coins des pièces, là où les robots ronds échouent systématiquement.</p><ul><li>Design carré pour les coins difficiles</li><li>Aspiration et lavage combinés</li><li>Navigation TrueMapping avancée</li></ul><h2>FAQ</h2><h3>Quel robot aspirateur choisir pour un appartement ?</h3><p>Pour un appartement, le Roomba j7+ est idéal grâce à sa compacité et son excellent évitement d'obstacles.</p><h3>Les robots aspirateurs fonctionnent-ils sur moquette ?</h3><p>Oui, tous nos modèles sélectionnés sont compatibles moquette avec détection automatique de surface.</p><h2>Sommaire</h2><ol><li><a href='#roomba'>iRobot Roomba j7+</a></li><li><a href='#roborock'>Roborock S8 Pro Ultra</a></li><li><a href='#deebot'>Ecovacs Deebot X2 Omni</a></li></ol>";
+  const planStep = {
+    status:
+      productsStep.status !== "done"
+        ? ("locked" as const)
+        : guide.planHtml
+        ? ("done" as const)
+        : ("locked" as const),
+    date: guide.planHtml ? new Date(guide.updatedAt).toLocaleDateString("fr-FR") : null,
+  };
 
-const planSeoKeywords = [
-  { expression: "robot aspirateur", target: 8, current: 6, ok: false },
-  { expression: "meilleur 2025", target: 4, current: 4, ok: true },
-  { expression: "autonomie", target: 5, current: 2, ok: false },
-  { expression: "navigation laser", target: 3, current: 0, ok: false },
-  { expression: "puissance aspiration", target: 3, current: 3, ok: true },
-  { expression: "station automatique", target: 2, current: 1, ok: false },
-];
+  const articleStep = {
+    status:
+      planStep.status !== "done"
+        ? ("locked" as const)
+        : guide.guideHtml
+        ? ("done" as const)
+        : ("locked" as const),
+    date: guide.guideHtml ? new Date(guide.updatedAt).toLocaleDateString("fr-FR") : null,
+  };
 
-const metaFixture = {
-  slug: "meilleurs-robots-aspirateurs-2025",
-  metaTitle: "Meilleurs robots aspirateurs 2025 — Comparatif & Avis",
-  metaDescription:
-    "Découvrez notre sélection des 5 meilleurs robots aspirateurs 2025. Comparatif complet, avis et guide d'achat pour choisir le modèle idéal.",
-  imageCaption: "Robot aspirateur iRobot Roomba j7+ sur parquet",
-};
-// ---------------------------------------------------------
+  return { guide: guideStep, products: productsStep, plan: planStep, article: articleStep };
+}
+
+function mapProducts(products: GuideProduct[]) {
+  return products.map((p) => ({
+    id: p.id,
+    asin: p.intelligence?.asin ?? "",
+    title: p.intelligence?.productTitle ?? "Produit inconnu",
+    brand: p.intelligence?.productBrand ?? "",
+    price: p.intelligence?.productPrice ?? "",
+    imageUrl: p.intelligence?.productImageUrl ?? "",
+    reviewCount: p.intelligence?.reviewCount ?? 0,
+    rating: 0,
+    status: (p.intelligence?.analyzed ? "done" : "pending") as "done" | "pending" | "error",
+  }));
+}
 
 export default function GuideDetailPage() {
+  const params = useParams();
+  const router = useRouter();
+  const id = params.id as string;
+  const [guide, setGuide] = useState<Guide | null>(null);
   const [activeTab, setActiveTab] = useState("overview");
+  const [deleting, setDeleting] = useState(false);
+
+  async function loadGuide() {
+    const res = await fetch(`/api/guides/${id}`);
+    if (res.ok) setGuide(await res.json());
+  }
+
+  useEffect(() => {
+    loadGuide();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]);
+
+  if (!guide) {
+    return (
+      <>
+        <Header title="Chargement…" />
+        <main className="p-6">
+          <p className="text-muted-foreground text-sm">Chargement du guide…</p>
+        </main>
+      </>
+    );
+  }
+
+  const overviewData = {
+    keyword: guide.title,
+    wordCountMin: guide.wordCountMin,
+    wordCountMax: guide.wordCountMax,
+    selectionCriteria: guide.criteria,
+    keywords: guide.keywords
+      .map((k) => ({
+        keyword: k.keyword,
+        min: k.minOccurrences,
+        max: k.maxOccurrences,
+      }))
+      .sort((a, b) => b.max - a.max),
+    steps: computeSteps(guide),
+  };
+
+  async function handleSaveCriteria(criteria: string) {
+    await fetch(`/api/guides/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ criteria }),
+    });
+    setGuide((prev) => (prev ? { ...prev, criteria } : prev));
+  }
 
   return (
     <>
-      <Header title="Meilleurs robots aspirateurs 2025">
+      <Header title={guide.title}>
         <Button variant="outline" size="sm" asChild>
           <Link href="/guides">
             <ArrowLeft className="mr-2 h-3 w-3" />
             Retour
           </Link>
         </Button>
-        <Button variant="destructive" size="sm" disabled>
-          <Trash2 className="mr-2 h-3 w-3" />
-          Supprimer
-        </Button>
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <Button variant="destructive" size="sm" disabled={deleting}>
+              <Trash2 className="mr-2 h-3 w-3" />
+              {deleting ? "Suppression…" : "Supprimer"}
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Supprimer ce guide ?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Le guide &laquo; {guide.title} &raquo; sera supprimé avec tous ses produits et mots-clés associés. Cette action est irréversible.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Annuler</AlertDialogCancel>
+              <AlertDialogAction
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                onClick={async () => {
+                  setDeleting(true);
+                  await fetch(`/api/guides/${id}`, { method: "DELETE" });
+                  router.push("/guides");
+                }}
+              >
+                Supprimer
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </Header>
 
       <main className="p-6 max-w-5xl">
@@ -113,27 +211,44 @@ export default function GuideDetailPage() {
           </TabsList>
 
           <TabsContent value="overview">
-            <TabOverview data={guideFixture} onTabChange={setActiveTab} />
+            <TabOverview
+              data={overviewData}
+              onTabChange={setActiveTab}
+            />
           </TabsContent>
 
           <TabsContent value="products">
-            <TabProducts products={productsFixture} />
+            <TabProducts
+              guideId={id}
+              products={mapProducts(guide.products)}
+              onRefresh={loadGuide}
+            />
           </TabsContent>
 
           <TabsContent value="plan">
             <TabPlan
-              initialHtml={planHtml}
-              seoScore={72}
-              seoKeywords={planSeoKeywords}
+              guideId={id}
+              initialHtml={guide.planHtml}
+              initialCriteria={guide.criteria}
+              keyword={guide.title}
+              seoScore={null}
+              seoKeywords={[]}
+              serpanticsUrl={guide.serpanticsGuideId ? `https://app.serpmantics.com/${guide.serpanticsGuideId}/edit` : undefined}
+              onRefresh={loadGuide}
+              onSaveCriteria={handleSaveCriteria}
+              onTabChange={setActiveTab}
             />
           </TabsContent>
 
           <TabsContent value="article">
             <TabArticle
-              initialHtml={articleHtml}
+              guideId={id}
+              initialHtml={guide.guideHtml}
               seoScore={null}
               seoKeywords={[]}
-              meta={metaFixture}
+              serpanticsUrl={guide.serpanticsGuideId ? `https://app.serpmantics.com/${guide.serpanticsGuideId}/edit` : undefined}
+              meta={{ slug: "", metaTitle: "", metaDescription: "", imageCaption: "" }}
+              onRefresh={loadGuide}
             />
           </TabsContent>
         </Tabs>

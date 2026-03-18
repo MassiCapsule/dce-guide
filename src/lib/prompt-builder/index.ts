@@ -10,7 +10,8 @@ export function buildGenerationPrompt(
   intelligence: ProductIntelligence,
   keyword: string,
   wordCount: number,
-  keywordAllocation?: KeywordAllocationItem[]
+  keywordAllocation?: KeywordAllocationItem[],
+  planSection?: string
 ): string {
   // Parse JSON string fields from media
   let doRules: string[] = [];
@@ -60,11 +61,6 @@ export function buildGenerationPrompt(
   if (doRules.length > 0) {
     sections.push(`## Regles a suivre (DO)
 ${doRules.map((r) => `- ${r}`).join("\n")}`);
-  }
-
-  if (dontRules.length > 0) {
-    sections.push(`## Regles a eviter (DON'T)
-${dontRules.map((r) => `- ${r}`).join("\n")}`);
   }
 
   // 4. Product info
@@ -123,13 +119,15 @@ Le mot-cle principal a cibler est : **${keyword}**
 Integre ce mot-cle naturellement dans le titre H1, au moins un H2, l'introduction, et plusieurs fois dans le corps du texte. Ne fais pas de bourrage de mots-cles.`);
   }
 
-  // 7. Structure template
-  sections.push(`## Structure de la fiche produit
-Suis cette structure pour organiser le contenu :
+  // 6b. Plan section for this product
+  if (planSection) {
+    sections.push(`## Brief éditorial du plan pour cette fiche
+Voici la section du plan éditorial correspondant à ce produit. Respecte scrupuleusement les briefs, la structure SAVE, les intertitres personnalisés et le nombre de mots indiqués :
 
-${media.productStructureTemplate}`);
+${planSection}`);
+  }
 
-  // 8. Word count target
+  // 7. Word count target
   sections.push(`## Objectif de longueur
 La fiche produit doit faire environ **${wordCount} mots**. Ne fais pas moins de ${Math.round(wordCount * 0.85)} mots et pas plus de ${Math.round(wordCount * 1.15)} mots.`);
 
