@@ -61,7 +61,7 @@ export async function chatCompletion(
     model,
     messages: messages.map((m) => ({ role: m.role, content: m.content })),
     temperature,
-    max_tokens: maxTokens,
+    max_completion_tokens: maxTokens,
     ...(jsonMode ? { response_format: { type: "json_object" as const } } : {}),
   });
 
@@ -126,7 +126,7 @@ export async function chatCompletionStream(
     stream: true,
     stream_options: { include_usage: true },
     temperature,
-    max_tokens: maxTokens,
+    max_completion_tokens: maxTokens,
   });
 
   const stream = (async function* () {

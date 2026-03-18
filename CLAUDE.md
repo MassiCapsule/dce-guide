@@ -1,5 +1,9 @@
 # CLAUDE.md — Mémoire du projet fiche-produit-generator
 
+## Liens utiles
+- **TODO** : [docs/todo.md](docs/todo.md) — Liste des tâches à faire
+- **Idées** : [docs/idees.md](docs/idees.md) — Idées futures
+
 ## Démarrer le projet
 
 **PowerShell (Windows) :**
@@ -50,7 +54,7 @@ Générateur de guides d'achat SEO avec fiches produits Amazon.
 | `src/components/guides/tabs/tab-overview.tsx` | Onglet Vue d'ensemble : infos guide, mots-clés collapsible, bouton "Ajouter des produits", progression |
 | `src/components/guides/tabs/tab-products.tsx` | Onglet Produits : ajout ASIN + scraping auto en un clic, suppression avec confirmation, polling |
 | `src/components/intelligence/intelligence-list.tsx` | Liste produits intelligence avec suppression + confirmation |
-| `src/components/guides/tabs/tab-plan.tsx` | Onglet Plan : critères éditables (PATCH) + bouton Perplexity + bouton "Générer le plan (IA)" + polling + RichEditor |
+| `src/components/guides/tabs/tab-plan.tsx` | Onglet Plan : critères éditables + bouton Perplexity + bouton "Générer le plan (IA)" (sauvegarde auto critères + validation obligatoire) + polling + RichEditor |
 | `src/components/guides/tabs/tab-article.tsx` | Onglet Article : bouton "Générer l'article (IA)" + polling + RichEditor |
 | `src/app/guides/[id]/page.tsx` | Page guide : charge vraies données API, passe guideId + onRefresh à chaque tab, suppression guide avec confirmation |
 
@@ -98,7 +102,7 @@ Générateur de guides d'achat SEO avec fiches produits Amazon.
 ### Modèles principaux
 - **AppConfig** : clé-valeur pour la config runtime (modèles IA par étape, prompts, clés API)
 - **Media** : profils éditoriaux avec ton, style, règles, template
-- **Guide** : guide d'achat avec statut, HTML généré, coûts, wordCountMin/Max, planHtml, guideHtml
+- **Guide** : guide d'achat avec statut, HTML généré, coûts, wordCountMin/Max, planHtml, guideHtml, seoScore, seoKeywords
 - **GuideProduct** : produits d'un guide avec allocation mots-clés
 - **GuideKeyword** : mots-clés SEO d'un guide (min/max occurrences)
 - **ProductIntelligence** : données scrappées + analyse IA par ASIN
@@ -111,6 +115,8 @@ Générateur de guides d'achat SEO avec fiches produits Amazon.
 | `criteria` | Critères de sélection des produits (éditable dans Tab Plan) |
 | `wordCountMin/Max` | Nb mots cible min/max (récupéré depuis Serpmantics) |
 | `serpanticsGuideId` | ID du guide Serpmantics (sauvegardé à la création, utilisé pour le score SEO) |
+| `seoScore` | Score SEO Serpmantics (Float?, persisté en DB après chaque calcul) |
+| `seoKeywords` | Mots-clés SEO avec occurrences (JSON string, persisté en DB) |
 | `planHtml` | Plan d'article généré par IA |
 | `guideHtml` | Article complet généré par IA |
 
@@ -215,6 +221,8 @@ Au submit du formulaire de création :
 ### Score SEO Serpmantics
 - `POST /api/guides/[id]/score` avec `{ content: html }` → appelle `POST /api/v1/score` Serpmantics avec `saveToGuide: true`
 - Retourne `{ score, keywords: [{ expression, target, current, ok }] }`
+- **Score persisté en DB** : `seoScore` (Float?) + `seoKeywords` (JSON string) sauvegardés après chaque calcul
+- Score rechargé automatiquement au chargement de la page (plus besoin de recalculer à chaque visite)
 - Déclenché automatiquement après génération du plan (Tab Plan)
 - Bouton "Recalculer" disponible dans Tab Plan et Tab Article — **NE PAS** passer directement `handleRecalculate` comme `onRecalculate`, toujours wrapper : `onRecalculate={() => handleRecalculate()}` (sinon MouseEvent est passé comme argument)
 - Le lien "Score SEO Serpmantics ↗" pointe vers `https://app.serpmantics.com/{serpanticsGuideId}/edit`
@@ -295,7 +303,7 @@ git push
 Architecture à 4 onglets avec **vraies données API** (plus de fixtures) :
 - **Vue d'ensemble** : infos guide (wordCount min/max, moyenne, produits recommandés), mots-clés collapsible triés par importance, bouton "Ajouter des produits" (visible tant que l'étape produits n'est pas "done"), progression des étapes
 - **Produits** : ajout ASIN(s), suppression avec AlertDialog de confirmation, lancer scraping, polling temps réel
-- **Plan** : critères de sélection éditables (PATCH) + bouton Perplexity + bouton "Générer le plan (IA)" + polling + RichEditor TipTap + bouton "Valider le plan →" (sauvegarde planHtml + bascule vers onglet Article)
+- **Plan** : critères de sélection éditables + bouton Perplexity + bouton "Générer le plan (IA)" pleine largeur (sauvegarde auto critères, critères obligatoires) + polling + RichEditor TipTap + bouton "Valider le plan →" (sauvegarde planHtml + bascule vers onglet Article)
 - **Article** : bouton "Générer l'article (IA)" + polling + RichEditor TipTap + "Éléments SEO" collapsible
 
 **Règles UX importantes :**
@@ -414,3 +422,12 @@ Champs **retirés de l'UI** (restent en DB, non utilisés) : `dontRules`, `produ
 | 2026-03-18 | Page Paramètres refactorisée en 2 onglets : Prompts (avec sélecteur modèle par prompt) et Clés API |
 | 2026-03-18 | Modèles disponibles : OpenAI (GPT-5.4, GPT-5 Mini), Anthropic (Claude Sonnet 4, Opus 4, Haiku 4) |
 | 2026-03-18 | Ordre des prompts : Critères Perplexity > Analyse > Generation > Plan |
+| 2026-03-18 | Fix `max_tokens` → `max_completion_tokens` pour OpenAI (GPT-5.4 et nouveaux modèles) |
+| 2026-03-18 | Bouton "Générer le plan (IA)" sauvegarde automatiquement les critères avant génération |
+| 2026-03-18 | Critères obligatoires : message d'erreur si vides au clic sur "Générer le plan (IA)" |
+| 2026-03-18 | Suppression bouton "Sauvegarder" critères (redondant avec sauvegarde auto) |
+| 2026-03-18 | UX Tab Plan : bouton Perplexity au-dessus du textarea à droite, bouton Générer pleine largeur |
+| 2026-03-18 | Score SEO persisté en DB : champs `seoScore` (Float?) + `seoKeywords` (JSON) sur Guide |
+| 2026-03-18 | Route `/api/guides/[id]/score` sauvegarde le score en DB après chaque calcul |
+| 2026-03-18 | Score SEO rechargé depuis DB au chargement de la page (plus besoin de recalculer) |
+| 2026-03-18 | Fix boucle infinie Recalculer : guard `scoreLoading` + catch réseau + sync props useEffect |

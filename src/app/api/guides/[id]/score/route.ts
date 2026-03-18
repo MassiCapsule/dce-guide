@@ -71,5 +71,14 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
     };
   });
 
+  // Persister le score en DB
+  await prisma.guide.update({
+    where: { id },
+    data: {
+      seoScore: score,
+      seoKeywords: JSON.stringify(keywords),
+    },
+  });
+
   return NextResponse.json({ score, keywords });
 }

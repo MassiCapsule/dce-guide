@@ -103,6 +103,8 @@ model Guide {
   wordCountMax          Int    @default(0)
 
   serpanticsGuideId     String @default("")
+  seoScore              Float?
+  seoKeywords           String @default("[]") // JSON: [{ expression, target, current, ok }]
   planHtml              String @default("")
   guideHtml             String @default("")
   guideWordCount        Int    @default(0)

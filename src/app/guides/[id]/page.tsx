@@ -45,6 +45,8 @@ interface Guide {
   wordCountMin: number;
   wordCountMax: number;
   serpanticsGuideId: string;
+  seoScore: number | null;
+  seoKeywords: string;
   planHtml: string;
   guideHtml: string;
   createdAt: string;
@@ -231,8 +233,8 @@ export default function GuideDetailPage() {
               initialHtml={guide.planHtml}
               initialCriteria={guide.criteria}
               keyword={guide.title}
-              seoScore={null}
-              seoKeywords={[]}
+              seoScore={guide.seoScore ?? null}
+              seoKeywords={(() => { try { return JSON.parse(guide.seoKeywords); } catch { return []; } })()}
               serpanticsUrl={guide.serpanticsGuideId ? `https://app.serpmantics.com/${guide.serpanticsGuideId}/edit` : undefined}
               onRefresh={loadGuide}
               onSaveCriteria={handleSaveCriteria}
@@ -244,8 +246,8 @@ export default function GuideDetailPage() {
             <TabArticle
               guideId={id}
               initialHtml={guide.guideHtml}
-              seoScore={null}
-              seoKeywords={[]}
+              seoScore={guide.seoScore ?? null}
+              seoKeywords={(() => { try { return JSON.parse(guide.seoKeywords); } catch { return []; } })()}
               serpanticsUrl={guide.serpanticsGuideId ? `https://app.serpmantics.com/${guide.serpanticsGuideId}/edit` : undefined}
               meta={{ slug: "", metaTitle: "", metaDescription: "", imageCaption: "" }}
               onRefresh={loadGuide}
