@@ -29,13 +29,12 @@ const MODELS = [
 const OPENAI_MODELS = MODELS.filter((m) => m.provider === "OpenAI");
 const ANTHROPIC_MODELS = MODELS.filter((m) => m.provider === "Anthropic");
 
-type PromptKey = "generation" | "analysis" | "criteres" | "plan";
+type PromptKey = "generation" | "analysis" | "criteres";
 
 const PROMPT_TABS: { key: PromptKey; label: string; hasModel: boolean }[] = [
   { key: "criteres", label: "Criteres Perplexity", hasModel: false },
   { key: "analysis", label: "Analyse", hasModel: true },
   { key: "generation", label: "Generation", hasModel: true },
-  { key: "plan", label: "Plan", hasModel: true },
 ];
 
 function ModelSelector({ value, onChange }: { value: string; onChange: (v: string) => void }) {
@@ -71,15 +70,12 @@ export default function ParametresPage() {
   const [generationPrompt, setGenerationPrompt] = useState("");
   const [analysisPrompt, setAnalysisPrompt] = useState("");
   const [criteresPrompt, setCriteresPrompt] = useState("");
-  const [planPrompt, setPlanPrompt] = useState("");
   const [promptTab, setPromptTab] = useState<PromptKey>("criteres");
   const [promptSaved, setPromptSaved] = useState(false);
 
   // Per-prompt models
   const [modelGeneration, setModelGeneration] = useState("gpt-4o");
   const [modelAnalysis, setModelAnalysis] = useState("gpt-4o");
-  const [modelPlan, setModelPlan] = useState("gpt-4o");
-
   // API keys
   const [openaiKey, setOpenaiKey] = useState("");
   const [anthropicKey, setAnthropicKey] = useState("");
@@ -98,11 +94,10 @@ export default function ParametresPage() {
         const fallbackModel = data.openai_model || "gpt-4o";
         setModelGeneration(data.model_generation || fallbackModel);
         setModelAnalysis(data.model_analysis || fallbackModel);
-        setModelPlan(data.model_plan || fallbackModel);
+        // model_plan is now configured per-media, not globally
         if (data.prompt_generation) setGenerationPrompt(data.prompt_generation);
         if (data.prompt_analysis) setAnalysisPrompt(data.prompt_analysis);
         if (data.prompt_criteres) setCriteresPrompt(data.prompt_criteres);
-        if (data.prompt_plan) setPlanPrompt(data.prompt_plan);
         if (data.serpmantics_api_key) setSerpmanticsKey(data.serpmantics_api_key);
       });
     fetch("/api/config/keys").then((r) => r.json()).then(setKeys);
@@ -112,7 +107,6 @@ export default function ParametresPage() {
         setGenerationPrompt((prev) => prev || defaults.generation);
         setAnalysisPrompt((prev) => prev || defaults.analysis);
         setCriteresPrompt((prev) => prev || defaults.criteres);
-        setPlanPrompt((prev) => prev || defaults.plan);
       });
   }, []);
 
@@ -131,16 +125,12 @@ export default function ParametresPage() {
     } else if (purpose === "analysis") {
       setModelAnalysis(value);
       saveModelForPrompt("model_analysis", value);
-    } else if (purpose === "plan") {
-      setModelPlan(value);
-      saveModelForPrompt("model_plan", value);
     }
   };
 
   const getCurrentModel = (tab: PromptKey) => {
     if (tab === "generation") return modelGeneration;
     if (tab === "analysis") return modelAnalysis;
-    if (tab === "plan") return modelPlan;
     return "";
   };
 
@@ -162,15 +152,10 @@ export default function ParametresPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ key: "prompt_criteres", value: criteresPrompt }),
       }),
-      fetch("/api/config", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ key: "prompt_plan", value: planPrompt }),
-      }),
     ]);
     setPromptSaved(true);
     setTimeout(() => setPromptSaved(false), 2000);
-  }, [generationPrompt, analysisPrompt, criteresPrompt, planPrompt]);
+  }, [generationPrompt, analysisPrompt, criteresPrompt]);
 
   const saveApiKey = async (configKey: string, value: string, setSaved: (v: boolean) => void) => {
     await fetch("/api/config", {
@@ -186,15 +171,13 @@ export default function ParametresPage() {
   const getPromptValue = (tab: PromptKey) => {
     if (tab === "generation") return generationPrompt;
     if (tab === "analysis") return analysisPrompt;
-    if (tab === "criteres") return criteresPrompt;
-    return planPrompt;
+    return criteresPrompt;
   };
 
   const setPromptValue = (tab: PromptKey, value: string) => {
     if (tab === "generation") setGenerationPrompt(value);
     else if (tab === "analysis") setAnalysisPrompt(value);
     else if (tab === "criteres") setCriteresPrompt(value);
-    else setPlanPrompt(value);
   };
 
   const currentTabConfig = PROMPT_TABS.find((t) => t.key === promptTab)!;

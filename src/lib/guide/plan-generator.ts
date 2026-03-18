@@ -130,9 +130,8 @@ export async function generatePlan(guideId: string): Promise<void> {
 
     const model = await getConfigModel("plan");
 
-    // Priorité : prompt du média > AppConfig global > défaut
-    const configPrompt = await prisma.appConfig.findUnique({ where: { key: "prompt_plan" } });
-    const promptTemplate = guide.media?.promptPlan?.trim() || configPrompt?.value || DEFAULT_PLAN_PROMPT;
+    // Priorité : prompt du média > défaut
+    const promptTemplate = guide.media?.promptPlan?.trim() || DEFAULT_PLAN_PROMPT;
 
     // Build product summaries
     const resumeProduits = guide.products

@@ -38,6 +38,9 @@ export function buildAnnotatedFromTemplate(
   const weaknessPoints = parseJson(intelligence.weaknessPoints);
   const remarkableQuotes = parseJson(intelligence.remarkableQuotes);
 
+  // Helper: prefix with "- " only if not already starting with "- "
+  const bullet = (s: string) => s.startsWith("- ") ? s : `- ${s}`;
+
   // Map of all known placeholders → resolved values
   const replacements: Record<string, string> = {
     // Media
@@ -45,8 +48,9 @@ export function buildAnnotatedFromTemplate(
     "{media.toneDescription}": media.toneDescription,
     "{media.writingStyle}": media.writingStyle,
     "{media.productStructureTemplate}": media.productStructureTemplate || "",
-    "{doRules}": doRules.map((r) => `- ${r}`).join("\n"),
-    "{dontRules}": dontRules.map((r) => `- ${r}`).join("\n"),
+    "{doRules}": doRules.map(bullet).join("\n"),
+    "{dontRules}": dontRules.map(bullet).join("\n"),
+    "{forbiddenWords}": parseJson(media.forbiddenWords).map(bullet).join("\n"),
 
     // Product Intelligence
     "{intelligence.productTitle}": intelligence.productTitle,

@@ -47,7 +47,7 @@ Générateur de guides d'achat SEO avec fiches produits Amazon.
 | Fichier | Rôle |
 |---------|------|
 | `src/components/guides/guide-form.tsx` | Formulaire création guides (keyword + media uniquement) — sans critères, sans ASINs |
-| `src/app/parametres/page.tsx` | Page config : 2 onglets (Prompts, Clés API). Prompts avec modèle IA par étape (Critères Perplexity, Analyse, Generation, Plan) |
+| `src/app/parametres/page.tsx` | Page config : 2 onglets (Prompts, Clés API). Prompts avec modèle IA par étape (Critères Perplexity, Analyse, Generation) |
 | `src/app/playground/page.tsx` | Playground : test prompt fiche produit avec badges variables, édition, génération |
 | `src/components/editor/rich-editor.tsx` | Éditeur WYSIWYG TipTap v3 (H1/H2/H3, gras, listes, tableau) |
 | `src/components/editor/seo-score-bar.tsx` | Barre score SEO Serpmantics + pills mots-clés |
@@ -79,7 +79,7 @@ Générateur de guides d'achat SEO avec fiches produits Amazon.
 | `/api/medias` | GET/POST | CRUD medias éditoriaux |
 | `/api/config` | GET/POST | Lire/écrire AppConfig (DB) |
 | `/api/config/keys` | GET | Afficher les clés API masquées |
-| `/api/config/prompts` | GET | Prompts par défaut (analysis, generation, criteres, plan) |
+| `/api/config/prompts` | GET | Prompts par défaut (analysis, generation, criteres) |
 | `/api/serpmantics/guide` | POST | Créer guide Serpmantics (avec `group: DCE-{NomMedia}-API`) + polling + extraction mots-clés triés par importance + wordCount + serpanticsGuideId |
 | `/api/playground/build-prompt` | POST | Construit le prompt de génération annoté (segments avec badges variables) depuis AppConfig |
 | `/api/playground/generate` | POST | Envoie un prompt au modèle IA choisi, retourne le HTML généré |
@@ -129,7 +129,8 @@ Générateur de guides d'achat SEO avec fiches produits Amazon.
 | Champ | Rôle |
 |-------|------|
 | `description` | Description courte du média (affichée dans le formulaire) |
-| `promptPlan` | Prompt de plan spécifique à ce média (prioritaire sur AppConfig global). Vide = utilise le global. |
+| `promptPlan` | Prompt de plan spécifique à ce média. Vide = utilise `DEFAULT_PLAN_PROMPT` hardcodé. |
+| `forbiddenWords` | Interdits lexicaux (JSON string array) — mots/expressions à ne jamais utiliser dans les contenus générés |
 
 ### Clés AppConfig importantes
 | Clé | Contenu |
@@ -138,10 +139,9 @@ Générateur de guides d'achat SEO avec fiches produits Amazon.
 | `model_analysis` | Modèle IA pour l'analyse des avis |
 | `model_plan` | Modèle IA pour la génération du plan |
 | `openai_model` | (legacy) Fallback si les modèles par étape ne sont pas configurés |
-| `prompt_generation` | Prompt template pour générer les fiches produits — placeholders : `{media.name}`, `{media.toneDescription}`, `{media.writingStyle}`, `{doRules}`, `{dontRules}`, `{intelligence.productTitle}`, `{intelligence.shortTitle}`, `{intelligence.productBrand}`, `{intelligence.productPrice}`, `{intelligence.asin}`, `{intelligence.positioningSummary}`, `{intelligence.keyFeatures}`, `{intelligence.detectedUsages}`, `{intelligence.buyerProfiles}`, `{intelligence.strengthPoints}`, `{intelligence.weaknessPoints}`, `{intelligence.recurringProblems}`, `{intelligence.remarkableQuotes}`, `{keyword}`, `{wordCount}`, `{planSection}` |
+| `prompt_generation` | Prompt template pour générer les fiches produits — placeholders : `{media.name}`, `{media.toneDescription}`, `{media.writingStyle}`, `{doRules}`, `{dontRules}`, `{forbiddenWords}`, `{intelligence.productTitle}`, `{intelligence.shortTitle}`, `{intelligence.productBrand}`, `{intelligence.productPrice}`, `{intelligence.asin}`, `{intelligence.positioningSummary}`, `{intelligence.keyFeatures}`, `{intelligence.detectedUsages}`, `{intelligence.buyerProfiles}`, `{intelligence.strengthPoints}`, `{intelligence.weaknessPoints}`, `{intelligence.recurringProblems}`, `{intelligence.remarkableQuotes}`, `{keyword}`, `{wordCount}`, `{planSection}` |
 | `prompt_analysis` | Prompt template pour analyser les avis — placeholders : `{title}`, `{brand}`, `{price}`, `{rating}`, `{reviewCount}`, `{description}`, `{features}`, `{count}`, `{reviews}`. Sections `**System**` et `**User**` détectées automatiquement |
 | `prompt_criteres` | Prompt Perplexity pour générer les critères (placeholder `#MotClesprincipal`) |
-| `prompt_plan` | Prompt génération du plan global — placeholders : `#NomMedia`, `#MotClePrincipal`, `#NombreMots`, `#Criteres`, `#ResumeProduits`, `#MotsCles` |
 | `openai_api_key` | Clé API OpenAI (saisie depuis /parametres > Clés API) |
 | `anthropic_api_key` | Clé API Anthropic (saisie depuis /parametres > Clés API) |
 | `apify_api_token` | Clé API Apify (saisie depuis /parametres > Clés API) |
@@ -261,7 +261,7 @@ Au submit du formulaire de création :
 | `/produits` | Produits scrappés |
 | `/intelligence` | Analyses IA structurées |
 | `/playground` | Playground : tester le prompt de génération fiche produit (charger, visualiser avec badges, éditer, générer) |
-| `/parametres` | Config runtime : 2 onglets — Prompts (modèle IA par étape + prompts éditables) et Clés API (OpenAI, Anthropic, Apify, Serpmantics) |
+| `/parametres` | Config runtime : 2 onglets — Prompts (Critères Perplexity, Analyse, Generation + modèle IA par étape) et Clés API (OpenAI, Anthropic, Apify, Serpmantics) |
 
 ---
 
@@ -334,8 +334,9 @@ Les ASINs sont ajoutés dans l'onglet Produits après création.
 
 Le prompt est résolu dans cet ordre de priorité :
 1. `media.promptPlan` (champ sur le média, éditable dans `/medias/[id]`)
-2. AppConfig `prompt_plan` (global, éditable dans `/parametres`)
-3. `DEFAULT_PLAN_PROMPT` (hardcodé dans `plan-generator.ts`)
+2. `DEFAULT_PLAN_PROMPT` (hardcodé dans `plan-generator.ts`)
+
+Note : le prompt plan n'est plus dans Paramètres (AppConfig `prompt_plan` supprimé de l'UI). Chaque média a son propre prompt plan.
 
 **Placeholders disponibles :** `#NomMedia`, `#MotClePrincipal`, `#NombreMots`, `#Criteres`, `#ResumeProduits`, `#MotsCles`
 
@@ -353,7 +354,7 @@ Les placeholders `{variable}` sont remplacés par les vraies données au moment 
 `src/lib/prompt-builder/index.ts` — construit le prompt codé en dur (utilisé par le pipeline article).
 `src/lib/prompt-builder/annotated.ts` — construit le prompt depuis le template AppConfig avec annotations (utilisé par le Playground).
 
-**Placeholders disponibles :** `{media.name}`, `{media.toneDescription}`, `{media.writingStyle}`, `{doRules}`, `{dontRules}`, `{intelligence.productTitle}`, `{intelligence.shortTitle}`, `{intelligence.productBrand}`, `{intelligence.productPrice}`, `{intelligence.asin}`, `{intelligence.positioningSummary}`, `{intelligence.keyFeatures}`, `{intelligence.detectedUsages}`, `{intelligence.buyerProfiles}`, `{intelligence.strengthPoints}`, `{intelligence.weaknessPoints}`, `{intelligence.recurringProblems}`, `{intelligence.remarkableQuotes}`, `{keyword}`, `{wordCount}`, `{planSection}`, `{media.productStructureTemplate}`
+**Placeholders disponibles :** `{media.name}`, `{media.toneDescription}`, `{media.writingStyle}`, `{doRules}`, `{dontRules}`, `{forbiddenWords}`, `{intelligence.productTitle}`, `{intelligence.shortTitle}`, `{intelligence.productBrand}`, `{intelligence.productPrice}`, `{intelligence.asin}`, `{intelligence.positioningSummary}`, `{intelligence.keyFeatures}`, `{intelligence.detectedUsages}`, `{intelligence.buyerProfiles}`, `{intelligence.strengthPoints}`, `{intelligence.weaknessPoints}`, `{intelligence.recurringProblems}`, `{intelligence.remarkableQuotes}`, `{keyword}`, `{wordCount}`, `{planSection}`, `{media.productStructureTemplate}`
 
 La section plan est extraite dans `article-generator.ts` via `extractPlanSection(planHtml, productTitle)` — compare les 20 premiers caractères du titre produit (normalisés) avec les H2 du plan.
 
@@ -376,15 +377,21 @@ Le prompt est un **template éditable** dans Paramètres > Analyse (clé `prompt
 
 | Champ | Rôle |
 |-------|------|
-| `name` | Nom du média |
-| `description` | Description courte du média |
-| `toneDescription` | Description du ton éditorial |
-| `writingStyle` | Style d'écriture |
-| `doRules` | Règles à suivre (injectées dans le prompt de génération) |
-| `defaultProductWordCount` | Nombre de mots par fiche produit |
-| `promptPlan` | Prompt plan spécifique (prioritaire sur AppConfig global) |
+| Champ | Badge prompt | Rôle |
+|-------|-------------|------|
+| `name` | `{media.name}` | Nom du média |
+| `description` | — | Description courte du média |
+| `toneDescription` | `{media.toneDescription}` | Description du ton éditorial |
+| `writingStyle` | `{media.writingStyle}` | Style d'écriture |
+| `doRules` | `{doRules}` | Règles à suivre (JSON array, une par ligne) |
+| `dontRules` | `{dontRules}` | Règles à éviter (JSON array, une par ligne) |
+| `forbiddenWords` | `{forbiddenWords}` | Interdits lexicaux (JSON array, un par ligne) |
+| `defaultProductWordCount` | — | Nombre de mots par fiche produit |
+| `promptPlan` | — | Prompt plan spécifique au média (placeholders `#NomMedia`, etc.) |
 
-Champs **retirés de l'UI média** (restent en DB) : `dontRules` (utilisé via placeholder `{dontRules}` dans le prompt generation), `productStructureTemplate`
+Champs **retirés de l'UI média** (restent en DB) : `productStructureTemplate`
+
+**Badges** : chaque champ du formulaire média affiche un badge `{placeholder}` à côté du label pour indiquer la variable à utiliser dans les prompts.
 
 ---
 
@@ -439,7 +446,7 @@ Champs **retirés de l'UI média** (restent en DB) : `dontRules` (utilisé via p
 | 2026-03-18 | Modèle IA configurable par étape : `model_generation`, `model_analysis`, `model_plan` (avec fallback `openai_model`) |
 | 2026-03-18 | Page Paramètres refactorisée en 2 onglets : Prompts (avec sélecteur modèle par prompt) et Clés API |
 | 2026-03-18 | Modèles disponibles : OpenAI (GPT-5.4, GPT-5 Mini), Anthropic (Claude Sonnet 4, Opus 4, Haiku 4) |
-| 2026-03-18 | Ordre des prompts : Critères Perplexity > Analyse > Generation > Plan |
+| 2026-03-18 | Ordre des prompts dans Paramètres : Critères Perplexity > Analyse > Generation |
 | 2026-03-18 | Fix `max_tokens` → `max_completion_tokens` pour OpenAI (GPT-5.4 et nouveaux modèles) |
 | 2026-03-18 | Bouton "Générer le plan (IA)" sauvegarde automatiquement les critères avant génération |
 | 2026-03-18 | Critères obligatoires : message d'erreur si vides au clic sur "Générer le plan (IA)" |
@@ -454,3 +461,8 @@ Champs **retirés de l'UI média** (restent en DB) : `dontRules` (utilisé via p
 | 2026-03-18 | Prompt analyse (`prompt_analysis`) lu depuis AppConfig — template avec placeholders `{title}`, `{brand}`, etc. |
 | 2026-03-18 | Champ `shortTitle` ajouté à ProductIntelligence — titre court généré par l'IA lors de l'analyse |
 | 2026-03-18 | Navigation : lien "Playground" ajouté dans la sidebar |
+| 2026-03-18 | Champ `forbiddenWords` ajouté au modèle Media — interdits lexicaux (JSON array), placeholder `{forbiddenWords}` |
+| 2026-03-18 | Formulaire média : badges `{placeholder}` affichés à côté de chaque label pour indiquer la variable prompt |
+| 2026-03-18 | Prompt plan supprimé des Paramètres — désormais uniquement sur le média (`media.promptPlan`) |
+| 2026-03-18 | Onglet "Plan" retiré de la page Paramètres (reste : Critères Perplexity, Analyse, Generation) |
+| 2026-03-18 | Helper `bullet()` dans prompt builders — évite le double tiret quand les règles commencent déjà par `- ` |

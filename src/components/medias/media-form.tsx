@@ -12,6 +12,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 
 interface MediaFormProps {
@@ -26,6 +27,7 @@ interface MediaFormProps {
     productStructureTemplate: string;
     defaultProductWordCount: number;
     promptPlan: string;
+    forbiddenWords: string;
   };
 }
 
@@ -63,6 +65,14 @@ export function MediaForm({ media }: MediaFormProps) {
     media?.defaultProductWordCount ?? 800
   );
   const [promptPlan, setPromptPlan] = useState(media?.promptPlan ?? "");
+  const [forbiddenWords, setForbiddenWords] = useState(() => {
+    if (!media?.forbiddenWords) return "";
+    try {
+      return JSON.parse(media.forbiddenWords).join("\n");
+    } catch {
+      return media.forbiddenWords;
+    }
+  });
   const [submitting, setSubmitting] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -79,6 +89,11 @@ export function MediaForm({ media }: MediaFormProps) {
         .map((r: string) => r.trim())
         .filter((r: string) => r.length > 0);
 
+      const forbiddenWordsArray = forbiddenWords
+        .split("\n")
+        .map((r: string) => r.trim())
+        .filter((r: string) => r.length > 0);
+
       const body = {
         name,
         description,
@@ -86,6 +101,7 @@ export function MediaForm({ media }: MediaFormProps) {
         writingStyle,
         doRules: JSON.stringify(doRulesArray),
         dontRules: JSON.stringify(dontRulesArray),
+        forbiddenWords: JSON.stringify(forbiddenWordsArray),
         productStructureTemplate,
         defaultProductWordCount,
         promptPlan,
@@ -133,7 +149,10 @@ export function MediaForm({ media }: MediaFormProps) {
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="space-y-2">
-            <Label htmlFor="name">Nom</Label>
+            <div className="flex items-center gap-2">
+              <Label htmlFor="name">Nom</Label>
+              <Badge variant="secondary" className="font-mono text-xs">{"{media.name}"}</Badge>
+            </div>
             <Input
               id="name"
               value={name}
@@ -155,7 +174,10 @@ export function MediaForm({ media }: MediaFormProps) {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="toneDescription">Description du ton</Label>
+            <div className="flex items-center gap-2">
+              <Label htmlFor="toneDescription">Description du ton</Label>
+              <Badge variant="secondary" className="font-mono text-xs">{"{media.toneDescription}"}</Badge>
+            </div>
             <Textarea
               id="toneDescription"
               value={toneDescription}
@@ -166,7 +188,10 @@ export function MediaForm({ media }: MediaFormProps) {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="writingStyle">Style d&apos;ecriture</Label>
+            <div className="flex items-center gap-2">
+              <Label htmlFor="writingStyle">Style d&apos;ecriture</Label>
+              <Badge variant="secondary" className="font-mono text-xs">{"{media.writingStyle}"}</Badge>
+            </div>
             <Textarea
               id="writingStyle"
               value={writingStyle}
@@ -177,7 +202,10 @@ export function MediaForm({ media }: MediaFormProps) {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="doRules">Regles a suivre</Label>
+            <div className="flex items-center gap-2">
+              <Label htmlFor="doRules">Regles a suivre</Label>
+              <Badge variant="secondary" className="font-mono text-xs">{"{doRules}"}</Badge>
+            </div>
             <Textarea
               id="doRules"
               value={doRules}
@@ -191,7 +219,10 @@ export function MediaForm({ media }: MediaFormProps) {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="dontRules">Regles a eviter</Label>
+            <div className="flex items-center gap-2">
+              <Label htmlFor="dontRules">Regles a eviter</Label>
+              <Badge variant="secondary" className="font-mono text-xs">{"{dontRules}"}</Badge>
+            </div>
             <Textarea
               id="dontRules"
               value={dontRules}
@@ -201,6 +232,23 @@ export function MediaForm({ media }: MediaFormProps) {
             />
             <p className="text-xs text-muted-foreground">
               Une regle par ligne
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <Label htmlFor="forbiddenWords">Interdits lexicaux</Label>
+              <Badge variant="secondary" className="font-mono text-xs">{"{forbiddenWords}"}</Badge>
+            </div>
+            <Textarea
+              id="forbiddenWords"
+              value={forbiddenWords}
+              onChange={(e) => setForbiddenWords(e.target.value)}
+              placeholder="Un mot ou expression par ligne"
+              rows={5}
+            />
+            <p className="text-xs text-muted-foreground">
+              Mots et expressions a ne jamais utiliser dans les contenus generes (un par ligne)
             </p>
           </div>
 
@@ -221,17 +269,17 @@ export function MediaForm({ media }: MediaFormProps) {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="promptPlan">Prompt génération du plan (spécifique à ce média)</Label>
+            <Label htmlFor="promptPlan">Prompt generation du plan</Label>
             <Textarea
               id="promptPlan"
               value={promptPlan}
               onChange={(e) => setPromptPlan(e.target.value)}
-              placeholder="Laissez vide pour utiliser le prompt global (Paramètres). Placeholders disponibles : #NomMedia, #MotClePrincipal, #NombreMots, #Criteres, #ResumeProduits, #MotsCles"
+              placeholder="Placeholders disponibles : #NomMedia, #MotClePrincipal, #NombreMots, #Criteres, #ResumeProduits, #MotsCles"
               rows={12}
               className="font-mono text-sm"
             />
             <p className="text-xs text-muted-foreground">
-              Si renseigné, ce prompt remplace le prompt global pour tous les guides de ce média.
+              Si vide, le prompt par defaut sera utilise.
             </p>
           </div>
 

@@ -29,6 +29,13 @@ export function buildGenerationPrompt(
     dontRules = [];
   }
 
+  let forbiddenWords: string[] = [];
+  try {
+    forbiddenWords = JSON.parse(media.forbiddenWords);
+  } catch {
+    forbiddenWords = [];
+  }
+
   // Parse JSON string fields from intelligence
   let keyFeatures: string[] = [];
   let detectedUsages: string[] = [];
@@ -46,6 +53,9 @@ export function buildGenerationPrompt(
   try { weaknessPoints = JSON.parse(intelligence.weaknessPoints); } catch {}
   try { remarkableQuotes = JSON.parse(intelligence.remarkableQuotes); } catch {}
 
+  // Helper: prefix with "- " only if not already starting with "- "
+  const bullet = (s: string) => s.startsWith("- ") ? s : `- ${s}`;
+
   const sections: string[] = [];
 
   // 1. System context
@@ -60,7 +70,14 @@ export function buildGenerationPrompt(
   // 3. Do/Don't rules
   if (doRules.length > 0) {
     sections.push(`## Regles a suivre (DO)
-${doRules.map((r) => `- ${r}`).join("\n")}`);
+${doRules.map(bullet).join("\n")}`);
+  }
+
+  // 3b. Forbidden words
+  if (forbiddenWords.length > 0) {
+    sections.push(`## Interdits lexicaux
+Ne jamais utiliser les mots ou expressions suivants :
+${forbiddenWords.map(bullet).join("\n")}`);
   }
 
   // 4. Product info
