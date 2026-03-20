@@ -56,7 +56,8 @@ Générateur de guides d'achat SEO avec fiches produits Amazon.
 | `src/components/guides/tabs/tab-products.tsx` | Onglet Produits : ajout ASIN + scraping auto en un clic, suppression avec confirmation, polling |
 | `src/components/intelligence/intelligence-list.tsx` | Liste produits intelligence avec suppression + confirmation |
 | `src/components/guides/tabs/tab-plan.tsx` | Onglet Plan : critères éditables + bouton Perplexity + bouton "Générer le plan (IA)" (sauvegarde auto critères + validation obligatoire) + polling + RichEditor |
-| `src/components/guides/tabs/tab-article.tsx` | Onglet Article : bouton "Générer l'article (IA)" + polling + RichEditor |
+| `src/components/guides/tabs/tab-article.tsx` | Onglet Article : bouton sticky "Générer l'article (IA)" pleine largeur + barre de progression + polling + RichEditor |
+| `src/components/guides/tabs/tab-article-v2.tsx` | Onglet Article V2 : bouton sticky "Générer l'article V2 (Humaniser)" + barre de progression + polling + RichEditor |
 | `src/app/guides/[id]/page.tsx` | Page guide : charge vraies données API, passe guideId + onRefresh à chaque tab, suppression guide avec confirmation |
 
 ### API Routes
@@ -72,7 +73,8 @@ Générateur de guides d'achat SEO avec fiches produits Amazon.
 | `/api/guides/[id]/scrape` | POST | Lancer scraping + analyse en arrière-plan |
 | `/api/guides/[id]/scrape` | GET | Polling statut scraping |
 | `/api/guides/[id]/plan` | POST | Lancer génération du plan en arrière-plan |
-| `/api/guides/[id]/article` | POST | Lancer génération de l'article en arrière-plan |
+| `/api/guides/[id]/article` | POST | Lancer génération de l'article V1 en arrière-plan |
+| `/api/guides/[id]/humanize` | POST | Lancer humanisation de l'article (V1 → V2) en arrière-plan |
 | `/api/guides/[id]/score` | POST | Calculer le score SEO Serpmantics sur un contenu HTML |
 | `/api/guides/[id]/status` | GET | Statut du pipeline (status, currentStep, errorMessage) |
 | `/api/guides/[id]/generate` | POST | (legacy) Pipeline complet monolithique |
@@ -98,6 +100,7 @@ Générateur de guides d'achat SEO avec fiches produits Amazon.
 | `src/lib/guide/scrape-step.ts` | Scraping Apify + analyse IA (modèle `model_analysis`) — status: scraping → analyzing → products-ready |
 | `src/lib/guide/plan-generator.ts` | Génération du plan IA (modèle `model_plan`) — status: generating-plan → plan-ready |
 | `src/lib/guide/article-generator.ts` | Distribution mots-clés + génération fiches + assemblage — status: distributing → generating → complete |
+| `src/lib/guide/humanize-step.ts` | Humanisation article V1 → V2 via prompt `prompt_humaniser` — status: humanizing → complete |
 | `src/lib/prompt-builder/annotated.ts` | Construit un prompt annoté depuis un template (placeholders → segments avec badges) pour le Playground |
 | `src/lib/intelligence/review-analyzer.ts` | Analyse IA des avis — charge le prompt depuis AppConfig (`prompt_analysis`), placeholders : `{title}`, `{brand}`, `{price}`, `{rating}`, `{reviewCount}`, `{description}`, `{features}`, `{count}`, `{reviews}` |
 
@@ -108,7 +111,7 @@ Générateur de guides d'achat SEO avec fiches produits Amazon.
 ### Modèles principaux
 - **AppConfig** : clé-valeur pour la config runtime (modèles IA par étape, prompts, clés API)
 - **Media** : profils éditoriaux avec ton, style, règles, template
-- **Guide** : guide d'achat avec statut, HTML généré, coûts, wordCountMin/Max, planHtml, guideHtml, seoScore, seoKeywords
+- **Guide** : guide d'achat avec statut, HTML généré, coûts, wordCountMin/Max, planHtml, guideHtml, guideHtmlV2, seoScore, seoKeywords
 - **GuideProduct** : produits d'un guide avec allocation mots-clés
 - **GuideKeyword** : mots-clés SEO d'un guide (min/max occurrences)
 - **ProductIntelligence** : données scrappées + analyse IA par ASIN (inclut `shortTitle` — titre court généré par l'IA)
@@ -117,14 +120,15 @@ Générateur de guides d'achat SEO avec fiches produits Amazon.
 ### Champs Guide importants
 | Champ | Rôle |
 |-------|------|
-| `status` | draft → scraping → analyzing → products-ready → generating-plan → plan-ready → distributing → generating → complete (ou error) |
+| `status` | draft → scraping → analyzing → products-ready → generating-plan → plan-ready → distributing → generating → humanizing → complete (ou error) |
 | `criteria` | Critères de sélection des produits (éditable dans Tab Plan) |
 | `wordCountMin/Max` | Nb mots cible min/max (récupéré depuis Serpmantics) |
 | `serpanticsGuideId` | ID du guide Serpmantics (sauvegardé à la création, utilisé pour le score SEO) |
 | `seoScore` | Score SEO Serpmantics (Float?, persisté en DB après chaque calcul) |
 | `seoKeywords` | Mots-clés SEO avec occurrences (JSON string, persisté en DB) |
 | `planHtml` | Plan d'article généré par IA |
-| `guideHtml` | Article complet généré par IA |
+| `guideHtml` | Article complet généré par IA (V1) |
+| `guideHtmlV2` | Article humanisé par IA (V2) |
 
 ### Champs Media importants
 | Champ | Rôle |
@@ -164,9 +168,9 @@ SERPMANTICS_API_KEY=""            ← fallback si pas configurée en DB
 
 ---
 
-## Workflow séquentiel — 5 étapes
+## Workflow séquentiel — 6 étapes
 
-La création d'un guide se fait en 5 étapes enchaînées naturellement :
+La création d'un guide se fait en 6 étapes enchaînées naturellement :
 
 ### Étape 1 — Créer le guide (`/guides/nouveau`)
 - Saisir keyword + media uniquement (pas de critères à cette étape)
@@ -192,7 +196,13 @@ La création d'un guide se fait en 5 étapes enchaînées naturellement :
 - Distribution mots-clés → génération fiche par produit → assemblage
 - Résultat dans `guide.guideHtml` → affiché dans RichEditor (éditable)
 
-### Étape 5 — Corrections (hors scope)
+### Étape 5 — Humaniser l'article (Tab Article V2)
+- Bouton "Générer l'article V2 (Humaniser)" → `POST /api/guides/[id]/humanize` → polling toutes les 3s
+- Charge le prompt `prompt_humaniser` depuis AppConfig, résout placeholders média + `{{fiche_produit_v1}}`
+- Appelle l'IA (modèle `model_generation`) pour réécrire l'article V1 en style humain
+- Résultat dans `guide.guideHtmlV2` → affiché dans RichEditor (éditable)
+
+### Étape 6 — Corrections (hors scope)
 
 **Règle fraîcheur scraping** : si un ProductIntelligence a moins de 180 jours, il n'est pas re-scrappé.
 
@@ -208,6 +218,8 @@ products → "done" si products.length > 0 && tous analyzed=true
 plan     → "done" si planHtml !== ""  (et products "done")
            "locked" sinon
 article  → "done" si guideHtml !== ""  (et plan "done")
+           "locked" sinon
+articleV2→ "done" si guideHtmlV2 !== ""  (et article "done")
            "locked" sinon
 ```
 
@@ -258,7 +270,7 @@ Au submit du formulaire de création :
 | `/` | Page d'accueil avec bouton "Générer un guide" |
 | `/guides` | Liste des guides |
 | `/guides/nouveau` | Formulaire création guide (keyword + media uniquement) |
-| `/guides/[id]` | Détail guide : 4 onglets avec vraies données API |
+| `/guides/[id]` | Détail guide : 5 onglets (Vue d'ensemble, Produits, Plan, Article, Article V2) avec vraies données API |
 | `/medias` | Profils éditoriaux (ton, style, template) |
 | `/produits` | Produits scrappés |
 | `/intelligence` | Analyses IA structurées |
@@ -308,11 +320,12 @@ git push
 
 ## Refonte page /guides/[id] — architecture finale
 
-Architecture à 4 onglets avec **vraies données API** (plus de fixtures) :
-- **Vue d'ensemble** : infos guide (wordCount min/max, moyenne, produits recommandés), mots-clés collapsible triés par importance, bouton "Ajouter des produits" (visible tant que l'étape produits n'est pas "done"), progression des étapes
+Architecture à 5 onglets avec **vraies données API** (plus de fixtures) :
+- **Vue d'ensemble** : infos guide (wordCount min/max, moyenne, produits recommandés), mots-clés collapsible triés par importance, bouton "Ajouter des produits" (visible tant que l'étape produits n'est pas "done"), progression des 6 étapes
 - **Produits** : ajout ASIN(s), suppression avec AlertDialog de confirmation, lancer scraping, polling temps réel
 - **Plan** : critères de sélection éditables + bouton Perplexity + bouton "Générer le plan (IA)" pleine largeur (sauvegarde auto critères, critères obligatoires) + polling + RichEditor TipTap + bouton "Valider le plan →" (sauvegarde planHtml + bascule vers onglet Article)
-- **Article** : bouton "Générer l'article (IA)" + polling + RichEditor TipTap + "Éléments SEO" collapsible
+- **Article** : bouton sticky "Générer l'article (IA)" pleine largeur + barre de progression par produit + polling + RichEditor TipTap + "Éléments SEO" collapsible
+- **Article V2** : bouton sticky "Générer l'article V2 (Humaniser)" pleine largeur + barre de progression + polling + RichEditor TipTap + "Éléments SEO" collapsible. Désactivé tant que l'article V1 n'est pas généré
 
 **Règles UX importantes :**
 - MetaFields (Slug, Meta title, Meta description, Légende image) → **Article uniquement**, dans un collapsible "Éléments SEO"
@@ -484,3 +497,11 @@ Champs **retirés de l'UI média** (restent en DB) : `productStructureTemplate`
 | 2026-03-18 | Playground : toggle "Badges / Texte brut" pour voir le prompt avec ou sans labels de variables (onglets Fiche produit et Plan) |
 | 2026-03-18 | `#MotsCles` inclut tous les mots-clés Serpmantics (suppression du `.slice(0, 30)`) — Playground et pipeline |
 | 2026-03-18 | `#MotsCles` triés par importance (`minOccurrences` décroissant) — Playground et pipeline |
+| 2026-03-20 | Tab Article : bouton sticky pleine largeur "Générer l'article (IA)" + barre de progression par produit (distributing → generating 1/N) |
+| 2026-03-20 | Champ `guideHtmlV2` ajouté au modèle Guide (migration Prisma) — article humanisé V2 |
+| 2026-03-20 | 5ème onglet "Article V2" dans /guides/[id] — humanisation de l'article V1 via prompt `prompt_humaniser` |
+| 2026-03-20 | Route `POST /api/guides/[id]/humanize` — lance humanisation en arrière-plan (status: humanizing → complete) |
+| 2026-03-20 | Service `humanize-step.ts` — charge prompt humaniser, résout placeholders média + `{{fiche_produit_v1}}`, appelle IA |
+| 2026-03-20 | Tab Article V2 : bouton sticky "Générer l'article V2 (Humaniser)" + barre de progression simulée + polling |
+| 2026-03-20 | Step "Article V2 (humanisé)" ajouté dans la progression Tab Overview |
+| 2026-03-20 | Composant `Progress` de shadcn/ui ajouté (barre de progression) |

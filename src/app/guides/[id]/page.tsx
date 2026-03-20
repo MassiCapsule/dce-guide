@@ -22,6 +22,7 @@ import { TabOverview } from "@/components/guides/tabs/tab-overview";
 import { TabProducts } from "@/components/guides/tabs/tab-products";
 import { TabPlan } from "@/components/guides/tabs/tab-plan";
 import { TabArticle } from "@/components/guides/tabs/tab-article";
+import { TabArticleV2 } from "@/components/guides/tabs/tab-article-v2";
 
 interface GuideProduct {
   id: string;
@@ -49,6 +50,7 @@ interface Guide {
   seoKeywords: string;
   planHtml: string;
   guideHtml: string;
+  guideHtmlV2: string;
   createdAt: string;
   updatedAt: string;
   products: GuideProduct[];
@@ -93,7 +95,17 @@ function computeSteps(guide: Guide) {
     date: guide.guideHtml ? new Date(guide.updatedAt).toLocaleDateString("fr-FR") : null,
   };
 
-  return { guide: guideStep, products: productsStep, plan: planStep, article: articleStep };
+  const articleV2Step = {
+    status:
+      articleStep.status !== "done"
+        ? ("locked" as const)
+        : guide.guideHtmlV2
+        ? ("done" as const)
+        : ("locked" as const),
+    date: guide.guideHtmlV2 ? new Date(guide.updatedAt).toLocaleDateString("fr-FR") : null,
+  };
+
+  return { guide: guideStep, products: productsStep, plan: planStep, article: articleStep, articleV2: articleV2Step };
 }
 
 function mapProducts(products: GuideProduct[]) {
@@ -210,6 +222,7 @@ export default function GuideDetailPage() {
             <TabsTrigger value="products">Produits</TabsTrigger>
             <TabsTrigger value="plan">Plan</TabsTrigger>
             <TabsTrigger value="article">Article</TabsTrigger>
+            <TabsTrigger value="article-v2">Article V2</TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview">
@@ -246,6 +259,19 @@ export default function GuideDetailPage() {
             <TabArticle
               guideId={id}
               initialHtml={guide.guideHtml}
+              seoScore={guide.seoScore ?? null}
+              seoKeywords={(() => { try { return JSON.parse(guide.seoKeywords); } catch { return []; } })()}
+              serpanticsUrl={guide.serpanticsGuideId ? `https://app.serpmantics.com/${guide.serpanticsGuideId}/edit` : undefined}
+              meta={{ slug: "", metaTitle: "", metaDescription: "", imageCaption: "" }}
+              onRefresh={loadGuide}
+            />
+          </TabsContent>
+
+          <TabsContent value="article-v2">
+            <TabArticleV2
+              guideId={id}
+              initialHtml={guide.guideHtmlV2}
+              hasV1={!!guide.guideHtml}
               seoScore={guide.seoScore ?? null}
               seoKeywords={(() => { try { return JSON.parse(guide.seoKeywords); } catch { return []; } })()}
               serpanticsUrl={guide.serpanticsGuideId ? `https://app.serpmantics.com/${guide.serpanticsGuideId}/edit` : undefined}

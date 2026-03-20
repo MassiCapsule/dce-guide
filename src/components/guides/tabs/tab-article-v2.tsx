@@ -15,9 +15,10 @@ interface SeoKeyword {
   ok: boolean;
 }
 
-interface TabArticleProps {
+interface TabArticleV2Props {
   guideId: string;
   initialHtml: string;
+  hasV1: boolean;
   seoScore: number | null;
   seoKeywords: SeoKeyword[];
   serpanticsUrl?: string;
@@ -30,17 +31,16 @@ interface TabArticleProps {
   onRefresh: () => void;
 }
 
-type GenerationPhase = "idle" | "distributing" | "generating" | "complete";
-
-export function TabArticle({
+export function TabArticleV2({
   guideId,
   initialHtml,
+  hasV1,
   seoScore,
   seoKeywords,
   serpanticsUrl,
   meta: metaProp,
   onRefresh,
-}: TabArticleProps) {
+}: TabArticleV2Props) {
   const [html, setHtml] = useState<string>(initialHtml);
   const [meta, setMeta] = useState(metaProp);
   const [score, setScore] = useState<number | null>(seoScore);
@@ -49,12 +49,9 @@ export function TabArticle({
   const [generating, setGenerating] = useState<boolean>(false);
   const [generateError, setGenerateError] = useState<string | null>(null);
   const [seoOpen, setSeoOpen] = useState<boolean>(false);
-  const [phase, setPhase] = useState<GenerationPhase>("idle");
-  const [currentStep, setCurrentStep] = useState<number>(0);
-  const [totalProducts, setTotalProducts] = useState<number>(0);
+  const [progress, setProgress] = useState<number>(0);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Sync if parent reloads guide data
   useEffect(() => {
     setHtml(initialHtml);
   }, [initialHtml]);
@@ -91,37 +88,26 @@ export function TabArticle({
     }
   };
 
-  function getProgressPercent(): number {
-    if (phase === "distributing") return 5;
-    if (phase === "generating" && totalProducts > 0) {
-      return 5 + Math.round((currentStep / totalProducts) * 95);
-    }
-    if (phase === "complete") return 100;
-    return 0;
-  }
-
-  function getProgressLabel(): string {
-    if (phase === "distributing") return "Distribution des mots-clés...";
-    if (phase === "generating" && totalProducts > 0) {
-      return `Génération fiche ${currentStep}/${totalProducts}...`;
-    }
-    return "";
-  }
-
-  async function handleGenerate() {
+  async function handleHumanize() {
     setGenerating(true);
     setGenerateError(null);
-    setPhase("distributing");
-    setCurrentStep(0);
+    setProgress(10);
 
-    const res = await fetch(`/api/guides/${guideId}/article`, { method: "POST" });
+    const res = await fetch(`/api/guides/${guideId}/humanize`, { method: "POST" });
     if (!res.ok) {
       const data = await res.json();
       setGenerateError(data.error || "Erreur démarrage");
       setGenerating(false);
-      setPhase("idle");
+      setProgress(0);
       return;
     }
+
+    // Progression simulée pendant l'attente (l'humanisation est un seul appel IA)
+    let tick = 10;
+    const progressInterval = setInterval(() => {
+      tick = Math.min(tick + 3, 90);
+      setProgress(tick);
+    }, 2000);
 
     // Polling toutes les 3s
     pollRef.current = setInterval(async () => {
@@ -129,28 +115,23 @@ export function TabArticle({
       if (!pollRes.ok) return;
       const data = await pollRes.json();
 
-      if (data.totalProducts) setTotalProducts(data.totalProducts);
-
-      if (data.status === "distributing") {
-        setPhase("distributing");
-      } else if (data.status === "generating") {
-        setPhase("generating");
-        setCurrentStep(data.currentStep || 0);
-      } else if (data.status === "complete") {
-        setPhase("complete");
+      if (data.status === "complete") {
+        clearInterval(progressInterval);
+        setProgress(100);
         setGenerating(false);
         stopPolling();
         const guideRes = await fetch(`/api/guides/${guideId}`);
         if (guideRes.ok) {
           const guide = await guideRes.json();
-          setHtml(guide.guideHtml || "");
+          setHtml(guide.guideHtmlV2 || "");
         }
-        setTimeout(() => setPhase("idle"), 1500);
+        setTimeout(() => setProgress(0), 1500);
         onRefresh();
       } else if (data.status === "error") {
+        clearInterval(progressInterval);
         setGenerateError(data.errorMessage || "Erreur inconnue");
         setGenerating(false);
-        setPhase("idle");
+        setProgress(0);
         stopPolling();
       }
     }, 3000);
@@ -204,11 +185,11 @@ export function TabArticle({
             <div className="flex items-center justify-between text-sm">
               <span className="flex items-center gap-2 font-medium">
                 <Loader2 className="h-4 w-4 animate-spin" />
-                {getProgressLabel()}
+                Humanisation en cours…
               </span>
-              <span className="text-muted-foreground">{getProgressPercent()}%</span>
+              <span className="text-muted-foreground">{progress}%</span>
             </div>
-            <Progress value={getProgressPercent()} className="h-2" />
+            <Progress value={progress} className="h-2" />
           </div>
         )}
 
@@ -216,21 +197,27 @@ export function TabArticle({
           <p className="text-sm text-red-600 mb-2">{generateError}</p>
         )}
 
+        {!hasV1 && (
+          <p className="text-sm text-muted-foreground mb-2">
+            L&apos;article V1 doit être généré avant de pouvoir humaniser.
+          </p>
+        )}
+
         <Button
-          onClick={handleGenerate}
-          disabled={generating}
+          onClick={handleHumanize}
+          disabled={generating || !hasV1}
           className="w-full"
           size="lg"
         >
           {generating ? (
             <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Génération en cours…
+              Humanisation en cours…
             </>
           ) : (
             <>
               <Sparkles className="mr-2 h-4 w-4" />
-              Générer l&apos;article (IA)
+              Générer l&apos;article V2 (Humaniser)
             </>
           )}
         </Button>

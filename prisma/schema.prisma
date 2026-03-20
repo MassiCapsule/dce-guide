@@ -110,6 +110,7 @@ model Guide {
   seoKeywords           String @default("[]") // JSON: [{ expression, target, current, ok }]
   planHtml              String @default("")
   guideHtml             String @default("")
+  guideHtmlV2           String @default("")
   guideWordCount        Int    @default(0)
   guidePromptUsed       String @default("")
   guideModelUsed        String @default("gpt-4o")
