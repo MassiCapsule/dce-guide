@@ -99,7 +99,8 @@ Générateur de guides d'achat SEO avec fiches produits Amazon.
 | `src/lib/guide/pipeline.ts` | (legacy) Pipeline complet monolithique |
 | `src/lib/guide/scrape-step.ts` | Scraping Apify + analyse IA (modèle `model_analysis`) — status: scraping → analyzing → products-ready |
 | `src/lib/guide/plan-generator.ts` | Génération du plan IA (modèle `model_plan`) — status: generating-plan → plan-ready |
-| `src/lib/guide/article-generator.ts` | Distribution mots-clés + génération fiches + assemblage — status: distributing → generating → complete |
+| `src/lib/guide/article-generator.ts` | Distribution mots-clés + génération fiches + résumé + enrichissements (chapô, sommaire, FAQ, méta) + assemblage — status: distributing → generating → summarizing → enriching → complete |
+| `src/lib/guide/enrichment-step.ts` | Enrichissement article : résumé, chapô+intro, sommaire, FAQ, méta — 4 appels parallèles via `Promise.allSettled` |
 | `src/lib/guide/humanize-step.ts` | Humanisation article V1 → V2 via prompt `prompt_humaniser` — status: humanizing → complete |
 | `src/lib/prompt-builder/annotated.ts` | Construit un prompt annoté depuis un template (placeholders → segments avec badges) pour le Playground |
 | `src/lib/intelligence/review-analyzer.ts` | Analyse IA des avis — charge le prompt depuis AppConfig (`prompt_analysis`), placeholders : `{title}`, `{brand}`, `{price}`, `{rating}`, `{reviewCount}`, `{description}`, `{features}`, `{count}`, `{reviews}` |
@@ -120,15 +121,23 @@ Générateur de guides d'achat SEO avec fiches produits Amazon.
 ### Champs Guide importants
 | Champ | Rôle |
 |-------|------|
-| `status` | draft → scraping → analyzing → products-ready → generating-plan → plan-ready → distributing → generating → humanizing → complete (ou error) |
+| `status` | draft → scraping → analyzing → products-ready → generating-plan → plan-ready → distributing → generating → summarizing → enriching → humanizing → complete (ou error) |
 | `criteria` | Critères de sélection des produits (éditable dans Tab Plan) |
 | `wordCountMin/Max` | Nb mots cible min/max (récupéré depuis Serpmantics) |
 | `serpanticsGuideId` | ID du guide Serpmantics (sauvegardé à la création, utilisé pour le score SEO) |
 | `seoScore` | Score SEO Serpmantics (Float?, persisté en DB après chaque calcul) |
 | `seoKeywords` | Mots-clés SEO avec occurrences (JSON string, persisté en DB) |
 | `planHtml` | Plan d'article généré par IA |
-| `guideHtml` | Article complet généré par IA (V1) |
+| `guideHtml` | Article complet assemblé par IA (chapô + sommaire + fiches + FAQ) |
 | `guideHtmlV2` | Article humanisé par IA (V2) |
+| `articleSummary` | Résumé de l'article (~200 mots, utilisé pour générer les éléments complémentaires) |
+| `chapoHtml` | Chapô (30 mots) + Introduction (100 mots) |
+| `sommaireHtml` | Sommaire / sélection produits |
+| `faqHtml` | FAQ 5 questions |
+| `metaTitle` | Meta title généré par IA (éditable dans Éléments SEO) |
+| `metaDescription` | Meta description générée par IA (éditable dans Éléments SEO) |
+| `imageCaption` | Légende photo générée par IA (éditable dans Éléments SEO) |
+| `slug` | Slug URL généré par IA (éditable dans Éléments SEO) |
 
 ### Champs Media importants
 | Champ | Rôle |
@@ -148,6 +157,11 @@ Générateur de guides d'achat SEO avec fiches produits Amazon.
 | `prompt_analysis` | Prompt template pour analyser les avis — placeholders : `{title}`, `{brand}`, `{price}`, `{rating}`, `{reviewCount}`, `{description}`, `{features}`, `{count}`, `{reviews}`. Sections `**System**` et `**User**` détectées automatiquement |
 | `prompt_criteres` | Prompt Perplexity pour générer les critères (placeholder `#MotClesprincipal`) |
 | `prompt_humaniser` | Prompt template pour humaniser les fiches produits — placeholders : `{media.toneDescription}`, `{media.writingStyle}`, `{{fiche_produit_v1}}` |
+| `prompt_resume` | Prompt pour résumer l'article — placeholder : `{article}` |
+| `prompt_chapo` | Prompt chapô (30 mots) + introduction (100 mots) — placeholders : `{media.name}`, `{media.toneDescription}`, `{media.writingStyle}`, `{forbiddenWords}`, `{keyword}`, `{resume}` |
+| `prompt_sommaire` | Prompt sommaire / sélection produits — mêmes placeholders que chapô |
+| `prompt_faq` | Prompt FAQ 5 questions — mêmes placeholders que chapô |
+| `prompt_meta` | Prompt meta title + meta description + légende + slug — mêmes placeholders que chapô |
 | `openai_api_key` | Clé API OpenAI (saisie depuis /parametres > Clés API) |
 | `anthropic_api_key` | Clé API Anthropic (saisie depuis /parametres > Clés API) |
 | `apify_api_token` | Clé API Apify (saisie depuis /parametres > Clés API) |
@@ -193,7 +207,13 @@ La création d'un guide se fait en 6 étapes enchaînées naturellement :
 
 ### Étape 4 — Générer l'article (Tab Article)
 - Bouton "Générer l'article (IA)" → `POST /api/guides/[id]/article` → polling toutes les 3s
-- Distribution mots-clés → génération fiche par produit → assemblage
+- Pipeline complet :
+  1. Distribution mots-clés (status: distributing)
+  2. Génération fiche par produit (status: generating, currentStep 1/N)
+  3. Résumé de l'article (status: summarizing) — ~200 mots, sauvé dans `articleSummary`
+  4. 4 appels parallèles (status: enriching) : chapô+intro, sommaire, FAQ, méta+slug
+  5. Assemblage final : chapô + sommaire + fiches + FAQ → `guideHtml`
+- MetaFields (slug, meta title, meta description, légende) pré-remplis automatiquement par l'IA
 - Résultat dans `guide.guideHtml` → affiché dans RichEditor (éditable)
 
 ### Étape 5 — Humaniser l'article (Tab Article V2)
@@ -275,7 +295,7 @@ Au submit du formulaire de création :
 | `/produits` | Produits scrappés |
 | `/intelligence` | Analyses IA structurées |
 | `/playground` | Playground : tester le prompt fiche produit (V1 génération + bouton Humaniser + prompts lecture seule avec lien vers Paramètres + V2 humanisée) |
-| `/parametres` | Config runtime : 2 onglets — Prompts (Critères Perplexity, Analyse, Generation, Humaniser + modèle IA par étape) et Clés API (OpenAI, Anthropic, Apify, Serpmantics) |
+| `/parametres` | Config runtime : 2 onglets — Prompts (Critères Perplexity, Analyse, Generation, Résumé, Chapô+Intro, Sommaire, FAQ, Méta+Slug, Humaniser + modèle IA par étape) et Clés API (OpenAI, Anthropic, Apify, Serpmantics) |
 
 ---
 
@@ -505,3 +525,10 @@ Champs **retirés de l'UI média** (restent en DB) : `productStructureTemplate`
 | 2026-03-20 | Tab Article V2 : bouton sticky "Générer l'article V2 (Humaniser)" + barre de progression simulée + polling |
 | 2026-03-20 | Step "Article V2 (humanisé)" ajouté dans la progression Tab Overview |
 | 2026-03-20 | Composant `Progress` de shadcn/ui ajouté (barre de progression) |
+| 2026-03-20 | Pipeline article enrichi : résumé → chapô+intro, sommaire, FAQ, méta en parallèle → assemblage final |
+| 2026-03-20 | 8 nouveaux champs Guide : `articleSummary`, `chapoHtml`, `sommaireHtml`, `faqHtml`, `metaTitle`, `metaDescription`, `imageCaption`, `slug` |
+| 2026-03-20 | Service `enrichment-step.ts` : `generateSummary()` + `generateEnrichments()` (4 appels `Promise.allSettled`) |
+| 2026-03-20 | 5 nouveaux prompts dans Paramètres : Résumé, Chapô+Intro, Sommaire, FAQ, Méta+Slug (clés `prompt_resume`, `prompt_chapo`, `prompt_sommaire`, `prompt_faq`, `prompt_meta`) |
+| 2026-03-20 | MetaFields pré-remplis par IA après génération (slug, meta title, meta description, légende) + bouton "Sauvegarder" |
+| 2026-03-20 | Route PATCH `/api/guides/[id]` accepte `slug`, `metaTitle`, `metaDescription`, `imageCaption` |
+| 2026-03-20 | Barre de progression enrichie : distributing → generating → summarizing → enriching → complete |
