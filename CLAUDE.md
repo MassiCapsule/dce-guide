@@ -1,6 +1,7 @@
 # CLAUDE.md — Mémoire du projet fiche-produit-generator
 
 ## Liens utiles
+- **README** : [README.md](README.md) — Documentation utilisateur (à mettre à jour en même temps que CLAUDE.md)
 - **TODO** : [docs/todo.md](docs/todo.md) — Liste des tâches à faire
 - **Idées** : [docs/idees.md](docs/idees.md) — Idées futures
 
