@@ -556,3 +556,4 @@ Champs **retirés de l'UI média** (restent en DB) : `productStructureTemplate`
 | 2026-03-20 | Playground refactorisé : sélecteur guide → produit → prompt résolu automatiquement (plus de copier-coller manuel) |
 | 2026-03-20 | API `POST /api/playground/resolve-prompt` — résout le template prompt_generation avec les vraies données guide + produit |
 | 2026-03-20 | Distribution mots-clés désactivée (commentée) — mots-clés gérés par le plan via `{planSection}` |
+| 2026-03-20 | Matching plan↔produit amélioré : comparaison par mots significatifs + nom de marque (>5 chars), supporte titres Amazon anglais vs plan français |
