@@ -114,26 +114,26 @@ export async function generateArticle(guideId: string): Promise<void> {
     const model = await getConfigModel("generation");
     let totalCost = guide.totalCost;
 
-    // --- DISTRIBUTION MOTS-CLÉS ---
-    await prisma.guide.update({
-      where: { id: guideId },
-      data: { status: "distributing", currentStep: 0 },
-    });
-
-    const keywordSpecs = guide.keywords.map((k) => ({
-      keyword: k.keyword,
-      minOccurrences: k.minOccurrences,
-      maxOccurrences: k.maxOccurrences,
-    }));
-
-    const allocations = distributeKeywords(keywordSpecs, guide.products.length);
-
-    for (let i = 0; i < guide.products.length; i++) {
-      await prisma.guideProduct.update({
-        where: { id: guide.products[i].id },
-        data: { keywordAllocation: JSON.stringify(allocations[i].keywords) },
-      });
-    }
+    // --- DISTRIBUTION MOTS-CLÉS (désactivée — mots-clés gérés par le plan) ---
+    // await prisma.guide.update({
+    //   where: { id: guideId },
+    //   data: { status: "distributing", currentStep: 0 },
+    // });
+    //
+    // const keywordSpecs = guide.keywords.map((k) => ({
+    //   keyword: k.keyword,
+    //   minOccurrences: k.minOccurrences,
+    //   maxOccurrences: k.maxOccurrences,
+    // }));
+    //
+    // const allocations = distributeKeywords(keywordSpecs, guide.products.length);
+    //
+    // for (let i = 0; i < guide.products.length; i++) {
+    //   await prisma.guideProduct.update({
+    //     where: { id: guide.products[i].id },
+    //     data: { keywordAllocation: JSON.stringify(allocations[i].keywords) },
+    //   });
+    // }
 
     // --- GÉNÉRATION FICHES ---
     await prisma.guide.update({
@@ -159,12 +159,8 @@ export async function generateArticle(guideId: string): Promise<void> {
       });
 
       const rp = readyProducts[i];
-      const allocation = JSON.parse(rp.keywordAllocation) as { keyword: string; targetCount: number }[];
 
-      const primaryKeyword =
-        allocation.length > 0
-          ? [...allocation].sort((a, b) => b.targetCount - a.targetCount)[0].keyword
-          : guide.title;
+      const primaryKeyword = guide.title;
 
       const planSection = extractPlanSection(guide.planHtml, rp.intelligence.productTitle);
 
@@ -174,7 +170,7 @@ export async function generateArticle(guideId: string): Promise<void> {
         rp.intelligence,
         primaryKeyword,
         guide.media.defaultProductWordCount,
-        allocation,
+        [],
         planSection
       );
 

@@ -100,9 +100,8 @@ export function TabArticle({
   };
 
   function getProgressPercent(): number {
-    if (phase === "distributing") return 5;
     if (phase === "generating" && totalProducts > 0) {
-      return 5 + Math.round((currentStep / totalProducts) * 55);
+      return Math.round((currentStep / totalProducts) * 60);
     }
     if (phase === "summarizing") return 65;
     if (phase === "enriching") return 85;
@@ -111,7 +110,6 @@ export function TabArticle({
   }
 
   function getProgressLabel(): string {
-    if (phase === "distributing") return "Distribution des mots-clés...";
     if (phase === "generating" && totalProducts > 0) {
       return `Génération fiche ${currentStep}/${totalProducts}...`;
     }
