@@ -97,13 +97,14 @@ Générateur de guides d'achat SEO avec fiches produits Amazon.
 | `src/lib/prisma.ts` | Client Prisma singleton |
 | `src/lib/keywords/distributor.ts` | Distribution mots-clés entre produits |
 | `src/lib/guide/pipeline.ts` | (legacy) Pipeline complet monolithique |
-| `src/lib/guide/scrape-step.ts` | Scraping Apify + analyse IA (modèle `model_analysis`) — status: scraping → analyzing → products-ready |
+| `src/lib/guide/scrape-step.ts` | Scraping Apify + analyse IA (modèle `model_analysis`) + tri par prix croissant — status: scraping → analyzing → products-ready |
 | `src/lib/guide/plan-generator.ts` | Génération du plan IA (modèle `model_plan`) — status: generating-plan → plan-ready |
-| `src/lib/guide/article-generator.ts` | Distribution mots-clés + génération fiches + résumé + enrichissements (chapô, sommaire, FAQ, méta) + assemblage — status: distributing → generating → summarizing → enriching → complete |
-| `src/lib/guide/enrichment-step.ts` | Enrichissement article : résumé, chapô+intro, sommaire, FAQ, méta — 4 appels parallèles via `Promise.allSettled` |
-| `src/lib/guide/humanize-step.ts` | Humanisation article V1 → V2 via prompt `prompt_humaniser` — status: humanizing → complete |
+| `src/lib/guide/article-generator.ts` | Distribution mots-clés + génération fiches (template DB `prompt_generation`) + résumé + enrichissements + assemblage — status: distributing → generating → summarizing → enriching → complete |
+| `src/lib/guide/enrichment-step.ts` | Enrichissement article : résumé, chapô+intro, sommaire, FAQ, méta — 4 appels parallèles via `Promise.allSettled`. Extrait les sections du plan (`::: Nom :::`) pour les injecter via `{planSection}`. `loadPrompt()` charge depuis DB uniquement (erreur si manquant) |
+| `src/lib/guide/humanize-step.ts` | Humanisation article V1 → V2 via prompt `prompt_humaniser` (DB uniquement) — status: humanizing → complete |
+| `src/lib/prompt-builder/index.ts` | (legacy) Ancien prompt builder hardcodé — **plus utilisé par le pipeline**, remplacé par le template DB `prompt_generation` |
 | `src/lib/prompt-builder/annotated.ts` | Construit un prompt annoté depuis un template (placeholders → segments avec badges) pour le Playground |
-| `src/lib/intelligence/review-analyzer.ts` | Analyse IA des avis — charge le prompt depuis AppConfig (`prompt_analysis`), placeholders : `{title}`, `{brand}`, `{price}`, `{rating}`, `{reviewCount}`, `{description}`, `{features}`, `{count}`, `{reviews}` |
+| `src/lib/intelligence/review-analyzer.ts` | Analyse IA des avis — charge le prompt depuis AppConfig (`prompt_analysis`, DB uniquement, erreur si manquant), placeholders : `{title}`, `{brand}`, `{price}`, `{rating}`, `{reviewCount}`, `{description}`, `{features}`, `{count}`, `{reviews}` |
 
 ---
 
@@ -153,15 +154,15 @@ Générateur de guides d'achat SEO avec fiches produits Amazon.
 | `model_analysis` | Modèle IA pour l'analyse des avis |
 | `model_plan` | Modèle IA pour la génération du plan |
 | `openai_model` | (legacy) Fallback si les modèles par étape ne sont pas configurés |
-| `prompt_generation` | Prompt template pour générer les fiches produits — placeholders : `{media.name}`, `{media.toneDescription}`, `{media.writingStyle}`, `{doRules}`, `{dontRules}`, `{forbiddenWords}`, `{intelligence.productTitle}`, `{intelligence.shortTitle}`, `{intelligence.productBrand}`, `{intelligence.productPrice}`, `{intelligence.asin}`, `{intelligence.positioningSummary}`, `{intelligence.keyFeatures}`, `{intelligence.detectedUsages}`, `{intelligence.buyerProfiles}`, `{intelligence.strengthPoints}`, `{intelligence.weaknessPoints}`, `{intelligence.recurringProblems}`, `{intelligence.remarkableQuotes}`, `{keyword}`, `{wordCount}`, `{planSection}` |
+| `prompt_generation` | Prompt template pour générer les fiches produits — **utilisé par le pipeline ET le Playground** — placeholders : `{media.name}`, `{media.toneDescription}`, `{media.writingStyle}`, `{doRules}`, `{dontRules}`, `{forbiddenWords}`, `{intelligence.productTitle}`, `{intelligence.shortTitle}`, `{intelligence.productBrand}`, `{intelligence.productPrice}`, `{intelligence.asin}`, `{intelligence.positioningSummary}`, `{intelligence.keyFeatures}`, `{intelligence.detectedUsages}`, `{intelligence.buyerProfiles}`, `{intelligence.strengthPoints}`, `{intelligence.weaknessPoints}`, `{intelligence.recurringProblems}`, `{intelligence.remarkableQuotes}`, `{keyword}`, `{keywords}`, `{wordCount}`, `{planSection}` |
 | `prompt_analysis` | Prompt template pour analyser les avis — placeholders : `{title}`, `{brand}`, `{price}`, `{rating}`, `{reviewCount}`, `{description}`, `{features}`, `{count}`, `{reviews}`. Sections `**System**` et `**User**` détectées automatiquement |
 | `prompt_criteres` | Prompt Perplexity pour générer les critères (placeholder `#MotClesprincipal`) |
 | `prompt_humaniser` | Prompt template pour humaniser les fiches produits — placeholders : `{media.toneDescription}`, `{media.writingStyle}`, `{{fiche_produit_v1}}` |
 | `prompt_resume` | Prompt pour résumer l'article — placeholder : `{article}` |
-| `prompt_chapo` | Prompt chapô (30 mots) + introduction (100 mots) — placeholders : `{media.name}`, `{media.toneDescription}`, `{media.writingStyle}`, `{forbiddenWords}`, `{keyword}`, `{resume}` |
-| `prompt_sommaire` | Prompt sommaire / sélection produits — mêmes placeholders que chapô |
-| `prompt_faq` | Prompt FAQ 5 questions — mêmes placeholders que chapô |
-| `prompt_meta` | Prompt meta title + meta description + légende + slug — mêmes placeholders que chapô |
+| `prompt_chapo` | Prompt chapô (30 mots) + introduction (100 mots) — placeholders : `{media.name}`, `{media.toneDescription}`, `{media.writingStyle}`, `{forbiddenWords}`, `{keyword}`, `{resume}`, `{planSection}` (= sections `::: Chapô :::` + `::: Introduction :::` du plan) |
+| `prompt_sommaire` | Prompt sommaire / sélection produits — mêmes placeholders + `{planSection}` (= section `::: Critères de sélection :::` du plan) |
+| `prompt_faq` | Prompt FAQ 5 questions — mêmes placeholders + `{planSection}` (= section `::: FAQ :::` du plan) |
+| `prompt_meta` | Prompt meta title + meta description + légende + slug — mêmes placeholders (sans `{planSection}`) |
 | `openai_api_key` | Clé API OpenAI (saisie depuis /parametres > Clés API) |
 | `anthropic_api_key` | Clé API Anthropic (saisie depuis /parametres > Clés API) |
 | `apify_api_token` | Clé API Apify (saisie depuis /parametres > Clés API) |
@@ -319,12 +320,14 @@ Crée un profil média par défaut "Blog Test Produit".
 ---
 
 ## Patterns à respecter
+- **Prompts** → **toujours depuis la DB** (AppConfig via Paramètres), jamais de fallback hardcodé. Si un prompt manque → erreur explicite. Les constantes dans `config/prompts/route.ts` servent uniquement de valeurs par défaut pour le pré-remplissage initial
 - **Clés API sensibles** → stockées en AppConfig (DB) via `POST /api/config`, jamais hardcodées
 - **Affichage clés** → masquées dans `/api/config/keys` (4 derniers caractères)
 - **Appels API externes** → toujours côté serveur (routes Next.js), jamais depuis le client
 - **Nouveaux paramètres runtime** → utiliser AppConfig, pas de nouvelles variables d'env
 - **Tâches longues** → lancées en arrière-plan (sans await), polling côté client toutes les 3s
 - **Polling pattern** : POST pour lancer → GET status toutes les 3s → quand status cible, recharger guide
+- **Tri produits** → après scraping, les produits sont triés par prix croissant (le moins cher en premier)
 
 ---
 
@@ -537,3 +540,8 @@ Champs **retirés de l'UI média** (restent en DB) : `productStructureTemplate`
 | 2026-03-20 | Prompt sommaire : H2 éditorialisé avec le mot-clé principal `{keyword}` et accords grammaticaux |
 | 2026-03-20 | Prompt méta : slug basé sur le mot-clé principal, 3 mots max |
 | 2026-03-20 | Prompts chapô, sommaire, FAQ : format de sortie HTML explicite (pas de markdown) |
+| 2026-03-20 | Produits triés par prix croissant après scraping (positions temporaires négatives pour éviter conflit unique) |
+| 2026-03-20 | Sections du plan injectées via `{planSection}` : Chapô+Intro, Critères, FAQ — extraites par `::: NomSection :::` |
+| 2026-03-20 | Suppression de tous les fallbacks hardcodés — prompts chargés depuis DB uniquement, erreur si manquant |
+| 2026-03-20 | Pipeline article utilise `prompt_generation` depuis Paramètres (template + placeholders) au lieu du prompt hardcodé `buildGenerationPrompt` |
+| 2026-03-20 | `{planSection}` dans `prompt_generation` = section du plan du produit en cours (tout le contenu entre deux H2) |
