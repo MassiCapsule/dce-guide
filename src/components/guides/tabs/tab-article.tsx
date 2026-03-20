@@ -30,7 +30,7 @@ interface TabArticleProps {
   onRefresh: () => void;
 }
 
-type GenerationPhase = "idle" | "distributing" | "generating" | "complete";
+type GenerationPhase = "idle" | "distributing" | "generating" | "summarizing" | "enriching" | "complete";
 
 export function TabArticle({
   guideId,
@@ -72,6 +72,14 @@ export function TabArticle({
     setMeta((prev) => ({ ...prev, [field]: value }));
   };
 
+  const handleSaveMeta = async () => {
+    await fetch(`/api/guides/${guideId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(meta),
+    });
+  };
+
   const handleRecalculate = async () => {
     if (!html) return;
     setScoreLoading(true);
@@ -94,8 +102,10 @@ export function TabArticle({
   function getProgressPercent(): number {
     if (phase === "distributing") return 5;
     if (phase === "generating" && totalProducts > 0) {
-      return 5 + Math.round((currentStep / totalProducts) * 95);
+      return 5 + Math.round((currentStep / totalProducts) * 55);
     }
+    if (phase === "summarizing") return 65;
+    if (phase === "enriching") return 85;
     if (phase === "complete") return 100;
     return 0;
   }
@@ -105,6 +115,8 @@ export function TabArticle({
     if (phase === "generating" && totalProducts > 0) {
       return `Génération fiche ${currentStep}/${totalProducts}...`;
     }
+    if (phase === "summarizing") return "Résumé de l'article...";
+    if (phase === "enriching") return "Génération des éléments (chapô, sommaire, FAQ, méta)...";
     return "";
   }
 
@@ -136,6 +148,10 @@ export function TabArticle({
       } else if (data.status === "generating") {
         setPhase("generating");
         setCurrentStep(data.currentStep || 0);
+      } else if (data.status === "summarizing") {
+        setPhase("summarizing");
+      } else if (data.status === "enriching") {
+        setPhase("enriching");
       } else if (data.status === "complete") {
         setPhase("complete");
         setGenerating(false);
@@ -144,6 +160,12 @@ export function TabArticle({
         if (guideRes.ok) {
           const guide = await guideRes.json();
           setHtml(guide.guideHtml || "");
+          setMeta({
+            slug: guide.slug || "",
+            metaTitle: guide.metaTitle || "",
+            metaDescription: guide.metaDescription || "",
+            imageCaption: guide.imageCaption || "",
+          });
         }
         setTimeout(() => setPhase("idle"), 1500);
         onRefresh();
@@ -190,6 +212,11 @@ export function TabArticle({
               imageCaption={meta.imageCaption}
               onChange={handleMetaChange}
             />
+            <div className="px-4 pb-3">
+              <Button variant="outline" size="sm" onClick={handleSaveMeta}>
+                Sauvegarder
+              </Button>
+            </div>
           </div>
         )}
       </div>

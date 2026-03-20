@@ -48,6 +48,14 @@ interface Guide {
   serpanticsGuideId: string;
   seoScore: number | null;
   seoKeywords: string;
+  slug: string;
+  metaTitle: string;
+  metaDescription: string;
+  imageCaption: string;
+  articleSummary: string;
+  chapoHtml: string;
+  sommaireHtml: string;
+  faqHtml: string;
   planHtml: string;
   guideHtml: string;
   guideHtmlV2: string;
@@ -262,7 +270,7 @@ export default function GuideDetailPage() {
               seoScore={guide.seoScore ?? null}
               seoKeywords={(() => { try { return JSON.parse(guide.seoKeywords); } catch { return []; } })()}
               serpanticsUrl={guide.serpanticsGuideId ? `https://app.serpmantics.com/${guide.serpanticsGuideId}/edit` : undefined}
-              meta={{ slug: "", metaTitle: "", metaDescription: "", imageCaption: "" }}
+              meta={{ slug: guide.slug || "", metaTitle: guide.metaTitle || "", metaDescription: guide.metaDescription || "", imageCaption: guide.imageCaption || "" }}
               onRefresh={loadGuide}
             />
           </TabsContent>
@@ -275,7 +283,7 @@ export default function GuideDetailPage() {
               seoScore={guide.seoScore ?? null}
               seoKeywords={(() => { try { return JSON.parse(guide.seoKeywords); } catch { return []; } })()}
               serpanticsUrl={guide.serpanticsGuideId ? `https://app.serpmantics.com/${guide.serpanticsGuideId}/edit` : undefined}
-              meta={{ slug: "", metaTitle: "", metaDescription: "", imageCaption: "" }}
+              meta={{ slug: guide.slug || "", metaTitle: guide.metaTitle || "", metaDescription: guide.metaDescription || "", imageCaption: guide.imageCaption || "" }}
               onRefresh={loadGuide}
             />
           </TabsContent>
