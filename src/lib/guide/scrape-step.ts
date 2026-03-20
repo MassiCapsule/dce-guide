@@ -124,13 +124,19 @@ export async function executeScrapeAndAnalyze(guideId: string): Promise<void> {
       (a, b) => parsePrice(a.intelligence.productPrice) - parsePrice(b.intelligence.productPrice)
     );
 
+    // D'abord mettre des positions temporaires négatives pour éviter les conflits de contrainte unique
     for (let i = 0; i < sorted.length; i++) {
-      if (sorted[i].position !== i + 1) {
-        await prisma.guideProduct.update({
-          where: { id: sorted[i].id },
-          data: { position: i + 1 },
-        });
-      }
+      await prisma.guideProduct.update({
+        where: { id: sorted[i].id },
+        data: { position: -(i + 1) },
+      });
+    }
+    // Puis remettre les vraies positions
+    for (let i = 0; i < sorted.length; i++) {
+      await prisma.guideProduct.update({
+        where: { id: sorted[i].id },
+        data: { position: i + 1 },
+      });
     }
 
     await prisma.guide.update({
