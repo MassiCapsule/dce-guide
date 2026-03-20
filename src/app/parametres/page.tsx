@@ -17,6 +17,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import ReactMarkdown from "react-markdown";
 
 const MODELS = [
   { value: "gpt-5.4", label: "GPT-5.4", provider: "OpenAI" },
@@ -84,6 +85,7 @@ export default function ParametresPage() {
   const [metaPrompt, setMetaPrompt] = useState("");
   const [promptTab, setPromptTab] = useState<PromptKey>("criteres");
   const [promptSaved, setPromptSaved] = useState(false);
+  const [readmeContent, setReadmeContent] = useState<string>("");
 
   // Per-prompt models
   const [modelGeneration, setModelGeneration] = useState("gpt-4o");
@@ -119,6 +121,7 @@ export default function ParametresPage() {
         if (data.serpmantics_api_key) setSerpmanticsKey(data.serpmantics_api_key);
       });
     fetch("/api/config/keys").then((r) => r.json()).then(setKeys);
+    fetch("/api/readme").then((r) => r.json()).then((data) => setReadmeContent(data.content));
     fetch("/api/config/prompts")
       .then((r) => r.json())
       .then((defaults) => {
@@ -256,6 +259,7 @@ export default function ParametresPage() {
           <TabsList className="mb-6">
             <TabsTrigger value="prompts">Prompts</TabsTrigger>
             <TabsTrigger value="keys">Cles API</TabsTrigger>
+            <TabsTrigger value="doc">Doc</TabsTrigger>
           </TabsList>
 
           {/* Onglet Prompts */}
@@ -429,6 +433,21 @@ export default function ParametresPage() {
                 </CardContent>
               </Card>
             </div>
+          </TabsContent>
+
+          {/* Onglet Documentation */}
+          <TabsContent value="doc">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Documentation</CardTitle>
+                <CardDescription>Guide d&apos;utilisation de l&apos;outil</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="prose prose-sm max-w-none dark:prose-invert">
+                  <ReactMarkdown>{readmeContent}</ReactMarkdown>
+                </div>
+              </CardContent>
+            </Card>
           </TabsContent>
         </Tabs>
       </main>
