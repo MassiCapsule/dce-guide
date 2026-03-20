@@ -11,6 +11,27 @@ import type { Media, ProductIntelligence } from "@prisma/client";
  * Extrait la section HTML du plan correspondant à un produit donné.
  * Cherche le H2 contenant le nom du produit et retourne tout jusqu'au H2 suivant.
  */
+/**
+ * Convertit du HTML en texte lisible, en préservant la structure.
+ * Les H2 deviennent "## Titre", les H3 "### Titre", les <li> "- item", etc.
+ */
+function htmlToReadableText(html: string): string {
+  return html
+    .replace(/<h1[^>]*>([\s\S]*?)<\/h1>/gi, "\n# $1\n")
+    .replace(/<h2[^>]*>([\s\S]*?)<\/h2>/gi, "\n## $1\n")
+    .replace(/<h3[^>]*>([\s\S]*?)<\/h3>/gi, "\n### $1\n")
+    .replace(/<li[^>]*>([\s\S]*?)<\/li>/gi, "- $1\n")
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/p>/gi, "\n")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
 function extractPlanSection(planHtml: string, productTitle: string): string {
   if (!planHtml || !productTitle) return "";
 
@@ -32,7 +53,8 @@ function extractPlanSection(planHtml: string, productTitle: string): string {
           if (/<h2/i.test(parts[j])) break;
           content += parts[j];
         }
-        return content;
+        // Convertir en texte lisible pour que l'IA comprenne la structure
+        return htmlToReadableText(content);
       }
     }
   }
