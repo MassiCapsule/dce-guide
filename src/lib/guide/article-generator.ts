@@ -15,7 +15,7 @@ import type { Media, ProductIntelligence } from "@prisma/client";
  * Convertit du HTML en texte lisible, en préservant la structure.
  * Les H2 deviennent "## Titre", les H3 "### Titre", les <li> "- item", etc.
  */
-function htmlToReadableText(html: string): string {
+export function htmlToReadableText(html: string): string {
   return html
     .replace(/<h1[^>]*>([\s\S]*?)<\/h1>/gi, "\n# $1\n")
     .replace(/<h2[^>]*>([\s\S]*?)<\/h2>/gi, "\n## $1\n")
@@ -32,7 +32,7 @@ function htmlToReadableText(html: string): string {
     .trim();
 }
 
-function extractPlanSection(planHtml: string, productTitle: string): string {
+export function extractPlanSection(planHtml: string, productTitle: string): string {
   if (!planHtml || !productTitle) return "";
 
   const normalize = (s: string) => s.toLowerCase().replace(/[^\w\s]/g, " ").replace(/\s+/g, " ").trim();
@@ -87,7 +87,7 @@ function extractPlanSection(planHtml: string, productTitle: string): string {
 /**
  * Résout le template de génération (depuis Paramètres) avec les données produit.
  */
-function resolveGenerationTemplate(
+export function resolveGenerationTemplate(
   template: string,
   media: Media,
   intelligence: ProductIntelligence,

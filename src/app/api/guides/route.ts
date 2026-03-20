@@ -6,6 +6,10 @@ export async function GET() {
     orderBy: { createdAt: "desc" },
     include: {
       media: { select: { name: true } },
+      products: {
+        orderBy: { position: "asc" },
+        include: { intelligence: { select: { id: true, productTitle: true } } },
+      },
       _count: { select: { products: true, keywords: true } },
     },
   });

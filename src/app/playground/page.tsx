@@ -153,16 +153,21 @@ function HtmlResultCard({
 
 // ─── Onglet Fiche Produit ───────────────────────────────────────────────────
 
+interface GuideOption {
+  id: string;
+  title: string;
+  mediaId: string;
+  products: { intelligenceId: string; productTitle: string }[];
+}
+
 function TabFicheProduit({ medias }: { medias: MediaOption[] }) {
+  const [guides, setGuides] = useState<GuideOption[]>([]);
+  const [guideId, setGuideId] = useState("");
   const [intelligenceId, setIntelligenceId] = useState("");
-  const [mediaId, setMediaId] = useState("");
-  const [keyword, setKeyword] = useState("");
-  const [wordCount, setWordCount] = useState<number>(800);
-  const [planSection, setPlanSection] = useState("");
   const [model, setModel] = useState("gpt-5.4");
 
-  const [segments, setSegments] = useState<PromptSegment[]>([]);
   const [fullPrompt, setFullPrompt] = useState("");
+  const [planSectionPreview, setPlanSectionPreview] = useState("");
 
   const [generatedHtml, setGeneratedHtml] = useState("");
   const [tokenInfo, setTokenInfo] = useState<{ promptTokens: number; completionTokens: number } | null>(null);
@@ -174,40 +179,45 @@ function TabFicheProduit({ medias }: { medias: MediaOption[] }) {
   const [generatedHtmlV2, setGeneratedHtmlV2] = useState("");
   const [tokenInfoV2, setTokenInfoV2] = useState<{ promptTokens: number; completionTokens: number } | null>(null);
   const [loadingHumanize, setLoadingHumanize] = useState(false);
-  const [showBadges, setShowBadges] = useState(true);
 
-  // Init media
+  // Charger la liste des guides
   useEffect(() => {
-    if (medias.length > 0 && !mediaId) {
-      setMediaId(medias[0].id);
-      setWordCount(medias[0].defaultProductWordCount || 800);
-    }
-  }, [medias, mediaId]);
+    fetch("/api/guides")
+      .then((r) => r.json())
+      .then((data) => {
+        const list = (Array.isArray(data) ? data : data.guides || []).map(
+          (g: { id: string; title: string; mediaId: string; products: { intelligence: { id: string; productTitle: string } | null }[] }) => ({
+            id: g.id,
+            title: g.title,
+            mediaId: g.mediaId,
+            products: (g.products || [])
+              .filter((p: { intelligence: { id: string; productTitle: string } | null }) => p.intelligence)
+              .map((p: { intelligence: { id: string; productTitle: string } | null }) => ({
+                intelligenceId: p.intelligence!.id,
+                productTitle: p.intelligence!.productTitle,
+              })),
+          })
+        );
+        setGuides(list);
+      });
+  }, []);
 
-  const handleMediaChange = (id: string) => {
-    setMediaId(id);
-    const m = medias.find((m) => m.id === id);
-    if (m) setWordCount(m.defaultProductWordCount || 800);
-  };
+  const selectedGuide = guides.find((g) => g.id === guideId);
 
   const handleLoadPrompt = async () => {
-    if (!intelligenceId.trim() || !mediaId) {
-      setError("ID Produit et Média sont requis");
+    if (!guideId || !intelligenceId) {
+      setError("Sélectionnez un guide et un produit");
       return;
     }
     setError("");
     setLoadingPrompt(true);
+    setFullPrompt("");
+    setPlanSectionPreview("");
     try {
-      const res = await fetch("/api/playground/build-prompt", {
+      const res = await fetch("/api/playground/resolve-prompt", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          intelligenceId: intelligenceId.trim(),
-          mediaId,
-          keyword: keyword.trim() || undefined,
-          wordCount,
-          planSection: planSection.trim() || undefined,
-        }),
+        body: JSON.stringify({ guideId, intelligenceId }),
       });
       if (!res.ok) {
         const data = await res.json();
@@ -215,8 +225,8 @@ function TabFicheProduit({ medias }: { medias: MediaOption[] }) {
         return;
       }
       const data = await res.json();
-      setSegments(data.segments);
-      setFullPrompt(data.fullPrompt);
+      setFullPrompt(data.prompt);
+      setPlanSectionPreview(data.planSection);
     } catch {
       setError("Erreur réseau");
     } finally {
@@ -255,7 +265,7 @@ function TabFicheProduit({ medias }: { medias: MediaOption[] }) {
   };
 
   const handleHumanize = async () => {
-    if (!generatedHtml || !mediaId) return;
+    if (!generatedHtml || !selectedGuide) return;
     setError("");
     setLoadingHumanize(true);
     setGeneratedHtmlV2("");
@@ -264,7 +274,7 @@ function TabFicheProduit({ medias }: { medias: MediaOption[] }) {
       const buildRes = await fetch("/api/playground/build-humanize-prompt", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ htmlV1: generatedHtml, mediaId }),
+        body: JSON.stringify({ htmlV1: generatedHtml, mediaId: selectedGuide.mediaId }),
       });
       if (!buildRes.ok) {
         const data = await buildRes.json();
@@ -303,43 +313,34 @@ function TabFicheProduit({ medias }: { medias: MediaOption[] }) {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-2">
-              <Label>ID Produit (ProductIntelligence)</Label>
-              <Input
-                placeholder="cmmvx75me0045zw3ocwbks0jo"
-                value={intelligenceId}
-                onChange={(e) => setIntelligenceId(e.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Média</Label>
-              <Select value={mediaId} onValueChange={handleMediaChange}>
+              <Label>Guide</Label>
+              <Select value={guideId} onValueChange={(v) => { setGuideId(v); setIntelligenceId(""); }}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Choisir un média" />
+                  <SelectValue placeholder="Choisir un guide" />
                 </SelectTrigger>
                 <SelectContent>
-                  {medias.map((m) => (
-                    <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>
+                  {guides.map((g) => (
+                    <SelectItem key={g.id} value={g.id}>{g.title}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-2">
-              <Label>Mot-clé principal</Label>
-              <Input
-                placeholder="robot patissier (optionnel)"
-                value={keyword}
-                onChange={(e) => setKeyword(e.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Nombre de mots</Label>
-              <Input
-                type="number"
-                value={wordCount}
-                onChange={(e) => setWordCount(Number(e.target.value))}
-              />
+              <Label>Produit</Label>
+              <Select value={intelligenceId} onValueChange={setIntelligenceId} disabled={!selectedGuide}>
+                <SelectTrigger>
+                  <SelectValue placeholder={selectedGuide ? "Choisir un produit" : "Choisissez un guide d'abord"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {selectedGuide?.products.map((p) => (
+                    <SelectItem key={p.intelligenceId} value={p.intelligenceId}>
+                      {p.productTitle}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-2">
               <Label>Modèle IA</Label>
@@ -347,55 +348,46 @@ function TabFicheProduit({ medias }: { medias: MediaOption[] }) {
             </div>
           </div>
 
-          <div className="space-y-2">
-            <Label>Section plan (collé manuellement)</Label>
-            <Textarea
-              placeholder="Collez ici la section du plan éditorial pour ce produit (brief SAVE, mots-clés, etc.)"
-              value={planSection}
-              onChange={(e) => setPlanSection(e.target.value)}
-              rows={6}
-            />
-          </div>
-
           {error && <p className="text-sm text-destructive">{error}</p>}
 
-          <Button onClick={handleLoadPrompt} disabled={loadingPrompt}>
+          <Button onClick={handleLoadPrompt} disabled={loadingPrompt || !guideId || !intelligenceId}>
             {loadingPrompt && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
             Charger le prompt
           </Button>
         </CardContent>
       </Card>
 
-      {segments.length > 0 && (
+      {planSectionPreview && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <FileText className="w-5 h-5" />
+              Section du plan extraite
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <pre className="whitespace-pre-wrap text-sm leading-relaxed font-mono bg-muted/30 rounded-lg p-4 max-h-[300px] overflow-y-auto">
+              {planSectionPreview}
+            </pre>
+          </CardContent>
+        </Card>
+      )}
+
+      {fullPrompt && (
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
-              <CardTitle>Prompt</CardTitle>
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setShowBadges(!showBadges)}
-                  className="flex items-center gap-1"
-                >
-                  {showBadges ? <Type className="w-3 h-3" /> : <Tags className="w-3 h-3" />}
-                  {showBadges ? "Texte brut" : "Badges"}
-                </Button>
-                <Button onClick={handleGenerate} disabled={loadingGenerate}>
-                  {loadingGenerate && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                  Générer
-                </Button>
-              </div>
+              <CardTitle>Prompt complet résolu</CardTitle>
+              <Button onClick={handleGenerate} disabled={loadingGenerate}>
+                {loadingGenerate && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                Générer
+              </Button>
             </div>
           </CardHeader>
           <CardContent>
-            {showBadges ? (
-              <AnnotatedPromptDisplay segments={segments} />
-            ) : (
-              <pre className="whitespace-pre-wrap text-sm leading-relaxed font-mono bg-muted/30 rounded-lg p-4 max-h-[600px] overflow-y-auto">
-                {fullPrompt}
-              </pre>
-            )}
+            <pre className="whitespace-pre-wrap text-sm leading-relaxed font-mono bg-muted/30 rounded-lg p-4 max-h-[600px] overflow-y-auto">
+              {fullPrompt}
+            </pre>
             <p className="text-xs text-muted-foreground mt-2">
               Pour modifier le template, rendez-vous dans <a href="/parametres" className="underline hover:text-foreground">Paramètres &rarr; Prompts</a>.
             </p>
