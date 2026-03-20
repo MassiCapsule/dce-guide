@@ -84,48 +84,4 @@ Les 9 prompts disponibles :
 | Méta + Slug | Générer slug, meta title, meta description et légende photo |
 | Humaniser | Réécrire l'article en style humain |
 
-Chaque prompt utilise des **placeholders** (variables entre accolades comme `{keyword}`, `{media.name}`, `{resume}`, etc.) qui sont remplacés automatiquement par les données réelles.
-
-### Paramètres > Clés API
-
-| Clé | Service |
-|-----|---------|
-| OpenAI | Génération IA (GPT) |
-| Anthropic | Génération IA (Claude) — alternative à OpenAI |
-| Apify | Scraping Amazon |
-| Serpmantics | Mots-clés SEO |
-
-### Médias
-
-Chaque média (profil éditorial) définit :
-- Le ton et le style d'écriture
-- Les règles à suivre (DO) et à éviter (DON'T)
-- Les mots interdits
-- Le nombre de mots par fiche produit
-- Optionnellement : un prompt de plan spécifique et un modèle IA dédié
-
----
-
-## Pages de l'application
-
-| Page | Description |
-|------|-------------|
-| `/` | Accueil — bouton "Générer un guide" |
-| `/guides` | Liste de tous les guides créés |
-| `/guides/nouveau` | Formulaire de création (mot-clé + média) |
-| `/guides/[id]` | Détail du guide — 5 onglets : Vue d'ensemble, Produits, Plan, Article, Article V2 |
-| `/medias` | Gestion des profils éditoriaux |
-| `/produits` | Liste des produits scrappés |
-| `/intelligence` | Analyses IA des produits |
-| `/playground` | Tester les prompts en temps réel |
-| `/parametres` | Prompts et clés API |
-
----
-
-## Démarrage
-
-```bash
-npm run dev
-```
-
-Ouvrir `http://localhost:3000`.
+Chaque prompt utilise des **placeholders** (variables entre accolades comme `{keyword}`, `{media.name}`, `{resume}`, `{planSection}`, etc.) qui sont remplacés automatiquement par les données réelles au moment de la génération.
