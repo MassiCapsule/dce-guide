@@ -74,13 +74,23 @@ export function RichEditor({
     }
   }, [content, editor])
 
-  const handleCopy = () => {
+  const handleCopy = async () => {
     if (!editor) return
     const html = editor.getHTML()
-    navigator.clipboard.writeText(html).then(() => {
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
-    })
+    try {
+      // Copie le contenu formaté (HTML + texte) pour coller avec mise en forme
+      await navigator.clipboard.write([
+        new ClipboardItem({
+          'text/html': new Blob([html], { type: 'text/html' }),
+          'text/plain': new Blob([editor.getText()], { type: 'text/plain' }),
+        }),
+      ])
+    } catch {
+      // Fallback si clipboard.write n'est pas supporté
+      await navigator.clipboard.writeText(editor.getText())
+    }
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
   }
 
   if (!editor) return null
