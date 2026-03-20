@@ -5,6 +5,7 @@ import { cleanHtml, countWords } from "@/lib/generator/html-formatter";
 import { distributeKeywords } from "@/lib/keywords/distributor";
 import { getConfigModel } from "@/lib/config";
 import { calculateCost } from "@/lib/pricing";
+import { generateSummary, generateEnrichments } from "./enrichment-step";
 
 /**
  * Extrait la section HTML du plan correspondant à un produit donné.
@@ -159,7 +160,46 @@ export async function generateArticle(guideId: string): Promise<void> {
       htmlParts.push(cleaned);
     }
 
-    const guideHtml = htmlParts.join("\n\n");
+    // --- RÉSUMÉ ---
+    const bodyHtml = htmlParts.join("\n\n");
+
+    await prisma.guide.update({
+      where: { id: guideId },
+      data: { status: "summarizing", currentStep: 0 },
+    });
+
+    const { summary, cost: summaryCost } = await generateSummary(bodyHtml, model);
+    totalCost += summaryCost;
+
+    await prisma.guide.update({
+      where: { id: guideId },
+      data: { articleSummary: summary },
+    });
+
+    // --- ENRICHISSEMENTS (4 appels parallèles) ---
+    await prisma.guide.update({
+      where: { id: guideId },
+      data: { status: "enriching", currentStep: 0 },
+    });
+
+    const { totalCost: enrichCost } = await generateEnrichments(
+      guideId, summary, guide.media, guide.title, model
+    );
+    totalCost += enrichCost;
+
+    // --- ASSEMBLAGE FINAL ---
+    const enriched = await prisma.guide.findUnique({
+      where: { id: guideId },
+      select: { chapoHtml: true, sommaireHtml: true, faqHtml: true },
+    });
+
+    const guideHtml = [
+      enriched?.chapoHtml,
+      enriched?.sommaireHtml,
+      bodyHtml,
+      enriched?.faqHtml,
+    ].filter(Boolean).join("\n\n");
+
     const guideWordCount = countWords(guideHtml);
 
     await prisma.guide.update({
