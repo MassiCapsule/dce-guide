@@ -106,6 +106,33 @@ export async function executeScrapeAndAnalyze(guideId: string): Promise<void> {
       }
     }
 
+    // --- TRI PAR PRIX (du moins cher au plus cher) ---
+    const allProducts = await prisma.guideProduct.findMany({
+      where: { guideId },
+      include: { intelligence: true },
+    });
+
+    const parsePrice = (s: string): number => {
+      if (!s) return Infinity;
+      // "29,99 €" → 29.99 / "1 234,56 €" → 1234.56
+      const cleaned = s.replace(/[^\d,.\s]/g, "").replace(/\s/g, "").replace(",", ".");
+      const num = parseFloat(cleaned);
+      return isNaN(num) ? Infinity : num;
+    };
+
+    const sorted = [...allProducts].sort(
+      (a, b) => parsePrice(a.intelligence.productPrice) - parsePrice(b.intelligence.productPrice)
+    );
+
+    for (let i = 0; i < sorted.length; i++) {
+      if (sorted[i].position !== i + 1) {
+        await prisma.guideProduct.update({
+          where: { id: sorted[i].id },
+          data: { position: i + 1 },
+        });
+      }
+    }
+
     await prisma.guide.update({
       where: { id: guideId },
       data: { status: "products-ready", currentStep: 0, totalCost },
