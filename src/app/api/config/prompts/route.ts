@@ -268,7 +268,7 @@ Mots interdits :
 
 Génère les éléments suivants basés sur l'ensemble du contenu fourni :
 
-1. Un slug URL (minuscules, tirets, sans accents, 3-5 mots)
+1. Un slug URL basé sur le mot-clé principal, 3 mots max, minuscules, tirets, sans accents
 2. Un méta title (question, 55-60 caractères espaces inclus)
 3. Une méta description (réponse directe, 150-160 caractères espaces inclus)
 4. Une légende photo courte qui apporte une info complémentaire à l'article
