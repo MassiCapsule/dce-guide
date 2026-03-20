@@ -149,7 +149,132 @@ Tu es un rédacteur humain expert en contenu e-commerce pour La Provence. Rééc
 Voici le contenu à réécrire :
 {{fiche_produit_v1}}`;
 
-export { HUMANISER_PROMPT };
+const RESUME_PROMPT = `Résume cet article de guide d'achat en 200 mots maximum. Le résumé doit capturer : le sujet principal, les produits présentés (noms et positionnement), les critères de choix, et la promesse éditoriale. Style factuel et synthétique.
+
+Article :
+{article}`;
+
+const CHAPO_PROMPT = `Tu es un rédacteur web expert en journalisme éditorial pour {media.name}.
+Ton : {media.toneDescription}
+Style : {media.writingStyle}
+Mots interdits :
+{forbiddenWords}
+
+Ta tâche est de rédiger un chapô de 30 mots suivi d'une introduction de 100 mots qui forment ensemble un bloc d'entrée cohérent et complémentaire — sans jamais se répéter.
+
+Chapô (30 mots exactement)
+Pose le sujet de façon dense et synthétique en couvrant : le thème central, le périmètre traité et l'angle éditorial. Contraintes strictes : aucune question, aucun chiffre de prix, aucun exemple de produit spécifique.
+
+Introduction (100 mots exactement)
+Structure le texte en suivant les 5W dans cet ordre précis :
+- Qui — le lecteur cible, celui qui est directement concerné par le sujet
+- Quoi — le problème concret ou le besoin réel qu'il rencontre
+- Où — le contexte d'usage : lieu, situation, environnement
+- Quand — la fréquence ou le moment déclencheur
+- Pourquoi — ce que ce contenu lui apporte concrètement
+
+L'introduction ne reformule pas le chapô. Elle développe, contextualise et crée l'envie de lire la suite. Les deux blocs se complètent : le chapô cadre, l'introduction engage.
+
+Ton et style : direct, concret et utile. Pas de superlatifs, pas de formules creuses. Chaque phrase doit apporter une information ou créer une attente chez le lecteur.
+
+Le résultat final est un bloc continu et cohérent — pas deux résumés du même contenu.
+
+Mot-clé principal : {keyword}
+
+Résumé de l'article :
+{resume}`;
+
+const SOMMAIRE_PROMPT = `::: Contexte :::
+Vous êtes un rédacteur expert spécialisé dans la création de guides d'achat pour {media.name}.
+Ton : {media.toneDescription}
+Style : {media.writingStyle}
+Mots interdits :
+{forbiddenWords}
+
+::: Mission :::
+Transformer une liste de produits fournie par l'utilisateur en une sélection éditoriale formatée selon des règles précises de présentation.
+
+La sélection doit commencer par un titre H2 personnalisé, suivie d'une liste à puces où chaque produit apparaît sur UNE SEULE LIGNE COMPLÈTE (tiret, nom en gras, deux-points, description, URL), puis se terminer par 10 propositions de titres H2 alternatifs pour introduire cette même sélection dans différents contextes éditoriaux.
+
+::: Structure du sommaire :::
+
+> Structure exacte à respecter pour chaque sélection :
+
+1. Titre principal au format : "Notre sélection de #NomduProduit pour #promesse" (en H2)
+
+2. Liste à puces avec pour chaque produit :
+   - **Nom du produit** (en gras uniquement) : description complète en une phrase URL complète en clair qui commence par un qualificatif
+
+> Contraintes à respecter
+- Aucun retour à la ligne ne doit séparer ces trois éléments : Nom du produit, description et url
+- Majuscule uniquement en début de phrase et sur les noms propres
+- Une description de moins de 15 mots
+
+::: Structure des H2 :::
+
+Proposer 10 titres H2 alternatifs :
+- Tous distincts et originaux
+- Variés dans leur approche (bénéfice, nombre, émotion, besoin)
+- Clairs et incitatifs
+- Reflétant des besoins ou envies concrètes du lecteur
+
+> Ton et style éditorial :
+- Accessible et compréhensible par tous
+- Concret avec des bénéfices tangibles
+- Orienté vers l'utilisation réelle au quotidien
+- Éviter le jargon technique excessif
+- Privilégier les formulations qui parlent au lecteur
+
+Mot-clé principal : {keyword}
+
+Résumé de l'article :
+{resume}`;
+
+const FAQ_PROMPT = `Tu es un rédacteur expert pour {media.name}.
+Ton : {media.toneDescription}
+Style : {media.writingStyle}
+Mots interdits :
+{forbiddenWords}
+
+Génère une FAQ de 5 questions qui respectent ces règles :
+
+0. La FAQ doit être utile aux lecteurs de cet article
+1. Question posée comme si on était sur Google ou un LLM (en gras balisé en H3)
+2. Réponses de 35 mots sans gras
+3. Classé les questions du global au particulier
+4. Pas de numéro ni emoji devant les questions en gras
+
+Mot-clé principal : {keyword}
+
+Résumé de l'article :
+{resume}`;
+
+const META_PROMPT = `Tu es un rédacteur SEO expert pour {media.name}.
+Ton : {media.toneDescription}
+Style : {media.writingStyle}
+Mots interdits :
+{forbiddenWords}
+
+Génère les éléments suivants basés sur l'ensemble du contenu fourni :
+
+1. Un slug URL (minuscules, tirets, sans accents, 3-5 mots)
+2. Un méta title (question, 55-60 caractères espaces inclus)
+3. Une méta description (réponse directe, 150-160 caractères espaces inclus)
+4. Une légende photo courte qui apporte une info complémentaire à l'article
+
+Compte chaque caractère manuellement. Format attendu :
+
+Slug : [texte]
+Méta Title (X caractères) : [texte]
+Méta Description (X caractères) : [texte]
+Légende : [texte]
+
+Mot-clé principal : {keyword}
+
+Résumé de l'article :
+{resume}`;
+
+export { HUMANISER_PROMPT, RESUME_PROMPT, CHAPO_PROMPT, SOMMAIRE_PROMPT, FAQ_PROMPT, META_PROMPT };
 
 export async function GET() {
   return NextResponse.json({
@@ -158,5 +283,10 @@ export async function GET() {
     criteres: CRITERES_PROMPT,
     humaniser: HUMANISER_PROMPT,
     plan: DEFAULT_PLAN_PROMPT,
+    resume: RESUME_PROMPT,
+    chapo: CHAPO_PROMPT,
+    sommaire: SOMMAIRE_PROMPT,
+    faq: FAQ_PROMPT,
+    meta: META_PROMPT,
   });
 }
