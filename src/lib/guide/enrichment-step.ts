@@ -17,15 +17,35 @@ function cleanMarkdown(text: string): string {
 }
 
 /**
+ * Convertit du HTML en texte lisible, en préservant la structure.
+ */
+function htmlToReadableText(html: string): string {
+  return html
+    .replace(/<h1[^>]*>([\s\S]*?)<\/h1>/gi, "\n# $1\n")
+    .replace(/<h2[^>]*>([\s\S]*?)<\/h2>/gi, "\n## $1\n")
+    .replace(/<h3[^>]*>([\s\S]*?)<\/h3>/gi, "\n### $1\n")
+    .replace(/<li[^>]*>([\s\S]*?)<\/li>/gi, "- $1\n")
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/p>/gi, "\n")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+/**
  * Extrait une section du plan par son nom (ex: "Chapô", "Introduction", "FAQ").
  * Cherche entre ::: NomSection ::: et la prochaine ::: ou la fin du texte.
- * Supprime les balises HTML pour ne garder que le texte brut.
+ * Convertit le HTML en texte lisible.
  */
 function extractPlanSectionByName(planHtml: string, sectionName: string): string {
   if (!planHtml || !sectionName) return "";
 
-  // Supprimer les balises HTML pour travailler sur le texte brut
-  const text = planHtml.replace(/<[^>]+>/g, "\n").replace(/&nbsp;/g, " ");
+  // Convertir en texte lisible d'abord
+  const text = htmlToReadableText(planHtml);
 
   // Chercher la section entre ::: NomSection ::: et la prochaine :::
   const regex = new RegExp(
