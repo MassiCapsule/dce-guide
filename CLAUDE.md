@@ -48,15 +48,15 @@ Générateur de guides d'achat SEO avec fiches produits Amazon.
 | Fichier | Rôle |
 |---------|------|
 | `src/components/guides/guide-form.tsx` | Formulaire création guides (keyword + media uniquement) — sans critères, sans ASINs |
-| `src/app/parametres/page.tsx` | Page config : 2 onglets (Prompts, Clés API). Prompts avec modèle IA par étape (Critères Perplexity, Analyse, Generation) |
-| `src/app/playground/page.tsx` | Playground : test prompt fiche produit avec badges variables, édition, génération, humanisation V2 |
-| `src/components/editor/rich-editor.tsx` | Éditeur WYSIWYG TipTap v3 (H1/H2/H3, gras, listes, tableau) |
+| `src/app/parametres/page.tsx` | Page config : 3 onglets (Prompts, Clés API, Doc). 9 sous-onglets prompts. Doc affiche le README |
+| `src/app/playground/page.tsx` | Playground : sélecteur guide → produit → prompt résolu complet → génération → humanisation V2 |
+| `src/components/editor/rich-editor.tsx` | Éditeur WYSIWYG TipTap v3 (H1/H2/H3, gras, listes, tableau, bouton copier formaté) |
 | `src/components/editor/seo-score-bar.tsx` | Barre score SEO Serpmantics + pills mots-clés |
 | `src/components/editor/meta-fields.tsx` | Champs méta : slug, meta title, meta desc, légende image |
 | `src/components/guides/tabs/tab-overview.tsx` | Onglet Vue d'ensemble : infos guide, mots-clés collapsible, bouton "Ajouter des produits", progression |
-| `src/components/guides/tabs/tab-products.tsx` | Onglet Produits : ajout ASIN + scraping auto en un clic, suppression avec confirmation, polling |
+| `src/components/guides/tabs/tab-products.tsx` | Onglet Produits : ajout ASIN, bouton sticky "Lancer la récupération" + barre de progression (scraping/analyse), suppression avec confirmation |
 | `src/components/intelligence/intelligence-list.tsx` | Liste produits intelligence avec suppression + confirmation |
-| `src/components/guides/tabs/tab-plan.tsx` | Onglet Plan : critères éditables + bouton Perplexity + bouton "Générer le plan (IA)" (sauvegarde auto critères + validation obligatoire) + polling + RichEditor |
+| `src/components/guides/tabs/tab-plan.tsx` | Onglet Plan : critères éditables + bouton Perplexity + bouton sticky "Générer le plan (IA)" + barre de progression + polling + RichEditor |
 | `src/components/guides/tabs/tab-article.tsx` | Onglet Article : bouton sticky "Générer l'article (IA)" pleine largeur + barre de progression + polling + RichEditor |
 | `src/components/guides/tabs/tab-article-v2.tsx` | Onglet Article V2 : bouton sticky "Générer l'article V2 (Humaniser)" + barre de progression + polling + RichEditor |
 | `src/app/guides/[id]/page.tsx` | Page guide : charge vraies données API, passe guideId + onRefresh à chaque tab, suppression guide avec confirmation |
@@ -82,9 +82,11 @@ Générateur de guides d'achat SEO avec fiches produits Amazon.
 | `/api/medias` | GET/POST | CRUD medias éditoriaux |
 | `/api/config` | GET/POST | Lire/écrire AppConfig (DB) |
 | `/api/config/keys` | GET | Afficher les clés API masquées |
-| `/api/config/prompts` | GET | Prompts par défaut (analysis, generation, criteres, humaniser) |
+| `/api/config/prompts` | GET | Prompts par défaut (valeurs de pré-remplissage, pas utilisées en production) |
+| `/api/readme` | GET | Contenu du README.md pour l'onglet Doc |
 | `/api/serpmantics/guide` | POST | Créer guide Serpmantics (avec `group: DCE-{NomMedia}-API`) + polling + extraction mots-clés triés par importance + wordCount + serpanticsGuideId |
-| `/api/playground/build-prompt` | POST | Construit le prompt de génération annoté (segments avec badges variables) depuis AppConfig |
+| `/api/playground/resolve-prompt` | POST | Résout le prompt de génération avec les vraies données d'un guide + produit (plan section extraite automatiquement) |
+| `/api/playground/build-prompt` | POST | (legacy) Construit le prompt annoté avec badges variables |
 | `/api/playground/generate` | POST | Envoie un prompt au modèle IA choisi, retourne le HTML généré |
 | `/api/playground/build-humanize-prompt` | POST | Construit le prompt d'humanisation (résout placeholders média + injecte HTML V1) |
 
@@ -296,7 +298,7 @@ Au submit du formulaire de création :
 | `/medias` | Profils éditoriaux (ton, style, template) |
 | `/produits` | Produits scrappés |
 | `/intelligence` | Analyses IA structurées |
-| `/playground` | Playground : tester le prompt fiche produit (V1 génération + bouton Humaniser + prompts lecture seule avec lien vers Paramètres + V2 humanisée) |
+| `/playground` | Playground : sélecteur guide → produit → prompt résolu complet → génération V1 → humanisation V2 |
 | `/parametres` | Config runtime : 2 onglets — Prompts (Critères Perplexity, Analyse, Generation, Résumé, Chapô+Intro, Sommaire, FAQ, Méta+Slug, Humaniser + modèle IA par étape) et Clés API (OpenAI, Anthropic, Apify, Serpmantics) |
 
 ---
@@ -545,4 +547,12 @@ Champs **retirés de l'UI média** (restent en DB) : `productStructureTemplate`
 | 2026-03-20 | Sections du plan injectées via `{planSection}` : Chapô+Intro, Critères, FAQ — extraites par `::: NomSection :::` |
 | 2026-03-20 | Suppression de tous les fallbacks hardcodés — prompts chargés depuis DB uniquement, erreur si manquant |
 | 2026-03-20 | Pipeline article utilise `prompt_generation` depuis Paramètres (template + placeholders) au lieu du prompt hardcodé `buildGenerationPrompt` |
-| 2026-03-20 | `{planSection}` dans `prompt_generation` = section du plan du produit en cours (tout le contenu entre deux H2) |
+| 2026-03-20 | `{planSection}` dans `prompt_generation` = section du plan du produit en cours (extrait par H3, H4→H2) |
+| 2026-03-20 | Extraction plan : produits par H3, sous-titres H4 convertis en H2, sections enrichissement par H2 (Chapô, Introduction, Critères, FAQ) |
+| 2026-03-20 | Conversion HTML→texte lisible (`htmlToReadableText`) pour toutes les sections plan envoyées à l'IA |
+| 2026-03-20 | Onglet Doc dans Paramètres — affiche le README.md formaté en markdown |
+| 2026-03-20 | Bouton "Copier" dans l'éditeur RichEditor — copie le contenu formaté (HTML + texte) pour coller avec mise en forme |
+| 2026-03-20 | Tab Produits harmonisé : bouton sticky pleine largeur + barre de progression (scraping 0-50%, analyse 50-100%) |
+| 2026-03-20 | Playground refactorisé : sélecteur guide → produit → prompt résolu automatiquement (plus de copier-coller manuel) |
+| 2026-03-20 | API `POST /api/playground/resolve-prompt` — résout le template prompt_generation avec les vraies données guide + produit |
+| 2026-03-20 | Distribution mots-clés désactivée (commentée) — mots-clés gérés par le plan via `{planSection}` |
