@@ -38,24 +38,84 @@ function htmlToReadableText(html: string): string {
 
 /**
  * Extrait une section du plan par son nom (ex: "Chapô", "Introduction", "FAQ").
- * Cherche entre ::: NomSection ::: et la prochaine ::: ou la fin du texte.
- * Convertit le HTML en texte lisible.
+ * Cherche le H2 correspondant et retourne tout le contenu jusqu'au H2 suivant.
+ * Supporte aussi le format ::: NomSection ::: en fallback.
  */
 function extractPlanSectionByName(planHtml: string, sectionName: string): string {
   if (!planHtml || !sectionName) return "";
 
-  // Convertir en texte lisible d'abord
-  const text = htmlToReadableText(planHtml);
+  const normalize = (s: string) => s.toLowerCase().replace(/[^\w\sàâäéèêëïîôùûüç]/g, " ").replace(/\s+/g, " ").trim();
+  const normalizedName = normalize(sectionName);
 
-  // Chercher la section entre ::: NomSection ::: et la prochaine :::
+  // Méthode 1 : chercher par H2
+  const h2Regex = /(<h2[\s\S]*?<\/h2>)/gi;
+  const parts = planHtml.split(h2Regex).filter(Boolean);
+
+  for (let i = 0; i < parts.length; i++) {
+    const part = parts[i];
+    if (/<h2/i.test(part)) {
+      const h2Text = normalize(part.replace(/<[^>]+>/g, ""));
+      if (h2Text.includes(normalizedName) || normalizedName.includes(h2Text)) {
+        // Capturer le contenu après ce H2 jusqu'au prochain H2
+        let content = "";
+        for (let j = i + 1; j < parts.length; j++) {
+          if (/<h2/i.test(parts[j])) break;
+          content += parts[j];
+        }
+        return htmlToReadableText(content);
+      }
+    }
+  }
+
+  // Méthode 2 (fallback) : chercher par ::: NomSection :::
+  const text = htmlToReadableText(planHtml);
   const regex = new RegExp(
     `:::\\s*${sectionName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*:::([\\s\\S]*?)(?=:::|$)`,
     "i"
   );
   const match = text.match(regex);
-  if (!match) return "";
+  if (match) return match[1].trim();
 
-  return match[1].trim();
+  return "";
+}
+
+/**
+ * Extrait la section critères du plan (le H2 entre Introduction et Fiches produits).
+ * Le titre de cette section varie selon le plan, on ne peut pas chercher par nom.
+ */
+function extractCriteriaPlanSection(planHtml: string): string {
+  if (!planHtml) return "";
+
+  const normalize = (s: string) => s.toLowerCase().replace(/[^\w\sàâäéèêëïîôùûüç]/g, " ").replace(/\s+/g, " ").trim();
+
+  const h2Regex = /(<h2[\s\S]*?<\/h2>)/gi;
+  const parts = planHtml.split(h2Regex).filter(Boolean);
+
+  let foundIntro = false;
+  for (let i = 0; i < parts.length; i++) {
+    const part = parts[i];
+    if (/<h2/i.test(part)) {
+      const h2Text = normalize(part.replace(/<[^>]+>/g, ""));
+      if (h2Text.includes("introduction")) {
+        foundIntro = true;
+        continue;
+      }
+      if (foundIntro && !h2Text.includes("fiche") && !h2Text.includes("produit")) {
+        // C'est le H2 des critères — capturer son contenu
+        let content = "";
+        for (let j = i + 1; j < parts.length; j++) {
+          if (/<h2/i.test(parts[j])) break;
+          content += parts[j];
+        }
+        return htmlToReadableText(part + content);
+      }
+      if (foundIntro && (h2Text.includes("fiche") || h2Text.includes("produit"))) {
+        break; // Pas de section critères trouvée
+      }
+    }
+  }
+
+  return "";
 }
 
 /**
@@ -180,7 +240,8 @@ export async function generateEnrichments(
     extractPlanSectionByName(planHtml, "Chapô"),
     extractPlanSectionByName(planHtml, "Introduction"),
   ].filter(Boolean).join("\n\n");
-  const sommairePlanSection = extractPlanSectionByName(planHtml, "Critères de sélection");
+  // Les critères sont le H2 entre Introduction et Fiches produits (titre variable)
+  const sommairePlanSection = extractCriteriaPlanSection(planHtml);
   const faqPlanSection = extractPlanSectionByName(planHtml, "FAQ");
 
   // Load all 4 prompts in parallel
