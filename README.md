@@ -66,22 +66,18 @@ Chaque onglet dispose d'un éditeur qui permet de modifier librement le contenu 
 
 ## Configuration
 
-### Paramètres > Prompts
+### Vos prompts, votre style
 
-Tous les prompts sont personnalisables dans `/parametres`. L'outil utilise **uniquement** les prompts configurés ici. Si un prompt manque, une erreur explicite s'affiche.
+L'outil s'adapte entièrement à votre ligne éditoriale. 9 prompts personnalisables pilotent chaque étape de la rédaction, tous modifiables dans Paramètres :
 
-Les 9 prompts disponibles :
+1. **Critères Perplexity** — Définissez comment l'IA recherche les critères de comparaison pour vos produits
+2. **Analyse** — Guidez l'extraction des points forts, faibles et usages depuis les avis clients Amazon
+3. **Génération** — Le coeur de la rédaction : chaque fiche produit est rédigée en suivant le brief du plan
+4. **Résumé** — L'article complet est résumé en ~200 mots pour servir de contexte aux éléments suivants
+5. **Chapô + Introduction** — Le bloc d'accroche qui donne envie de lire, calibré sur le brief du plan
+6. **Sommaire** — La sélection éditoriale des produits, avec liens et descriptions courtes
+7. **FAQ** — 5 questions/réponses pensées pour le lecteur et le référencement
+8. **Méta + Slug** — Les éléments SEO essentiels : URL, titre, description et légende photo
+9. **Humaniser** — La réécriture finale qui efface les tics d'écriture IA
 
-| Prompt | Rôle |
-|--------|------|
-| Critères Perplexity | Générer les critères de sélection via Perplexity |
-| Analyse | Analyser les avis clients d'un produit |
-| Génération | Rédiger chaque fiche produit (reçoit `{planSection}` = le brief du produit depuis le plan) |
-| Résumé | Résumer l'article complet (~200 mots) |
-| Chapô + Intro | Rédiger le chapô et l'introduction (reçoit `{planSection}` = sections Chapô + Introduction du plan) |
-| Sommaire | Créer la sélection produits (reçoit `{planSection}` = section Critères du plan) |
-| FAQ | Générer les 5 questions/réponses (reçoit `{planSection}` = section FAQ du plan) |
-| Méta + Slug | Générer slug, meta title, meta description et légende photo |
-| Humaniser | Réécrire l'article en style humain |
-
-Chaque prompt utilise des **placeholders** (variables entre accolades comme `{keyword}`, `{media.name}`, `{resume}`, `{planSection}`, etc.) qui sont remplacés automatiquement par les données réelles au moment de la génération.
+Chaque prompt utilise des variables (entre accolades) qui sont remplacées automatiquement par les données réelles : nom du média, mot-clé, résumé, brief du plan, données produit, etc.
