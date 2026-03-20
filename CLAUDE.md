@@ -532,3 +532,8 @@ Champs **retirés de l'UI média** (restent en DB) : `productStructureTemplate`
 | 2026-03-20 | MetaFields pré-remplis par IA après génération (slug, meta title, meta description, légende) + bouton "Sauvegarder" |
 | 2026-03-20 | Route PATCH `/api/guides/[id]` accepte `slug`, `metaTitle`, `metaDescription`, `imageCaption` |
 | 2026-03-20 | Barre de progression enrichie : distributing → generating → summarizing → enriching → complete |
+| 2026-03-20 | Tab Plan : bouton sticky pleine largeur + barre de progression simulée (comme Tab Article) |
+| 2026-03-20 | H1 de l'article extrait du plan (`planHtml`) au lieu de `guide.title` — fallback si pas de H1 dans le plan |
+| 2026-03-20 | Prompt sommaire : H2 éditorialisé avec le mot-clé principal `{keyword}` et accords grammaticaux |
+| 2026-03-20 | Prompt méta : slug basé sur le mot-clé principal, 3 mots max |
+| 2026-03-20 | Prompts chapô, sommaire, FAQ : format de sortie HTML explicite (pas de markdown) |
