@@ -29,12 +29,17 @@ const MODELS = [
 const OPENAI_MODELS = MODELS.filter((m) => m.provider === "OpenAI");
 const ANTHROPIC_MODELS = MODELS.filter((m) => m.provider === "Anthropic");
 
-type PromptKey = "generation" | "analysis" | "criteres" | "humaniser";
+type PromptKey = "generation" | "analysis" | "criteres" | "humaniser" | "resume" | "chapo" | "sommaire" | "faq" | "meta";
 
 const PROMPT_TABS: { key: PromptKey; label: string; hasModel: boolean }[] = [
   { key: "criteres", label: "Criteres Perplexity", hasModel: false },
   { key: "analysis", label: "Analyse", hasModel: true },
   { key: "generation", label: "Generation", hasModel: true },
+  { key: "resume", label: "Resume", hasModel: false },
+  { key: "chapo", label: "Chapo + Intro", hasModel: false },
+  { key: "sommaire", label: "Sommaire", hasModel: false },
+  { key: "faq", label: "FAQ", hasModel: false },
+  { key: "meta", label: "Meta + Slug", hasModel: false },
   { key: "humaniser", label: "Humaniser", hasModel: false },
 ];
 
@@ -72,6 +77,11 @@ export default function ParametresPage() {
   const [analysisPrompt, setAnalysisPrompt] = useState("");
   const [criteresPrompt, setCriteresPrompt] = useState("");
   const [humaniserPrompt, setHumaniserPrompt] = useState("");
+  const [resumePrompt, setResumePrompt] = useState("");
+  const [chapoPrompt, setChapoPrompt] = useState("");
+  const [sommairePrompt, setSommairePrompt] = useState("");
+  const [faqPrompt, setFaqPrompt] = useState("");
+  const [metaPrompt, setMetaPrompt] = useState("");
   const [promptTab, setPromptTab] = useState<PromptKey>("criteres");
   const [promptSaved, setPromptSaved] = useState(false);
 
@@ -101,6 +111,11 @@ export default function ParametresPage() {
         if (data.prompt_analysis) setAnalysisPrompt(data.prompt_analysis);
         if (data.prompt_criteres) setCriteresPrompt(data.prompt_criteres);
         if (data.prompt_humaniser) setHumaniserPrompt(data.prompt_humaniser);
+        if (data.prompt_resume) setResumePrompt(data.prompt_resume);
+        if (data.prompt_chapo) setChapoPrompt(data.prompt_chapo);
+        if (data.prompt_sommaire) setSommairePrompt(data.prompt_sommaire);
+        if (data.prompt_faq) setFaqPrompt(data.prompt_faq);
+        if (data.prompt_meta) setMetaPrompt(data.prompt_meta);
         if (data.serpmantics_api_key) setSerpmanticsKey(data.serpmantics_api_key);
       });
     fetch("/api/config/keys").then((r) => r.json()).then(setKeys);
@@ -111,6 +126,11 @@ export default function ParametresPage() {
         setAnalysisPrompt((prev) => prev || defaults.analysis);
         setCriteresPrompt((prev) => prev || defaults.criteres);
         setHumaniserPrompt((prev) => prev || defaults.humaniser);
+        setResumePrompt((prev) => prev || defaults.resume);
+        setChapoPrompt((prev) => prev || defaults.chapo);
+        setSommairePrompt((prev) => prev || defaults.sommaire);
+        setFaqPrompt((prev) => prev || defaults.faq);
+        setMetaPrompt((prev) => prev || defaults.meta);
       });
   }, []);
 
@@ -161,10 +181,35 @@ export default function ParametresPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ key: "prompt_humaniser", value: humaniserPrompt }),
       }),
+      fetch("/api/config", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ key: "prompt_resume", value: resumePrompt }),
+      }),
+      fetch("/api/config", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ key: "prompt_chapo", value: chapoPrompt }),
+      }),
+      fetch("/api/config", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ key: "prompt_sommaire", value: sommairePrompt }),
+      }),
+      fetch("/api/config", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ key: "prompt_faq", value: faqPrompt }),
+      }),
+      fetch("/api/config", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ key: "prompt_meta", value: metaPrompt }),
+      }),
     ]);
     setPromptSaved(true);
     setTimeout(() => setPromptSaved(false), 2000);
-  }, [generationPrompt, analysisPrompt, criteresPrompt, humaniserPrompt]);
+  }, [generationPrompt, analysisPrompt, criteresPrompt, humaniserPrompt, resumePrompt, chapoPrompt, sommairePrompt, faqPrompt, metaPrompt]);
 
   const saveApiKey = async (configKey: string, value: string, setSaved: (v: boolean) => void) => {
     await fetch("/api/config", {
@@ -181,6 +226,11 @@ export default function ParametresPage() {
     if (tab === "generation") return generationPrompt;
     if (tab === "analysis") return analysisPrompt;
     if (tab === "humaniser") return humaniserPrompt;
+    if (tab === "resume") return resumePrompt;
+    if (tab === "chapo") return chapoPrompt;
+    if (tab === "sommaire") return sommairePrompt;
+    if (tab === "faq") return faqPrompt;
+    if (tab === "meta") return metaPrompt;
     return criteresPrompt;
   };
 
@@ -189,6 +239,11 @@ export default function ParametresPage() {
     else if (tab === "analysis") setAnalysisPrompt(value);
     else if (tab === "criteres") setCriteresPrompt(value);
     else if (tab === "humaniser") setHumaniserPrompt(value);
+    else if (tab === "resume") setResumePrompt(value);
+    else if (tab === "chapo") setChapoPrompt(value);
+    else if (tab === "sommaire") setSommairePrompt(value);
+    else if (tab === "faq") setFaqPrompt(value);
+    else if (tab === "meta") setMetaPrompt(value);
   };
 
   const currentTabConfig = PROMPT_TABS.find((t) => t.key === promptTab)!;
