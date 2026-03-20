@@ -4,7 +4,8 @@ import { useState, useEffect, useRef } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { CheckCircle2, Clock, AlertCircle, Loader2, Plus, Trash2 } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
+import { CheckCircle2, Clock, AlertCircle, Loader2, Plus, Trash2, Sparkles } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -36,6 +37,8 @@ interface TabProductsProps {
 
 const SCRAPING_STATUSES = ["scraping", "analyzing"];
 
+type ScrapePhase = "idle" | "scraping" | "analyzing" | "done";
+
 function StatusBadge({ status }: { status: Product["status"] }) {
   if (status === "done") {
     return (
@@ -66,8 +69,10 @@ export function TabProducts({ guideId, products, onRefresh }: TabProductsProps) 
   const [adding, setAdding] = useState(false);
   const [scraping, setScraping] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Product | null>(null);
-  const [scrapeStatus, setScrapeStatus] = useState<string | null>(null);
   const [scrapeError, setScrapeError] = useState<string | null>(null);
+  const [phase, setPhase] = useState<ScrapePhase>("idle");
+  const [currentStep, setCurrentStep] = useState(0);
+  const [totalProducts, setTotalProducts] = useState(0);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   function stopPolling() {
@@ -79,7 +84,29 @@ export function TabProducts({ guideId, products, onRefresh }: TabProductsProps) 
 
   useEffect(() => () => stopPolling(), []);
 
-  async function handleAddAndScrape() {
+  function getProgressPercent(): number {
+    if (totalProducts === 0) return 0;
+    if (phase === "scraping") {
+      return Math.round((currentStep / totalProducts) * 50);
+    }
+    if (phase === "analyzing") {
+      return 50 + Math.round((currentStep / totalProducts) * 50);
+    }
+    if (phase === "done") return 100;
+    return 0;
+  }
+
+  function getProgressLabel(): string {
+    if (phase === "scraping") {
+      return `Scraping produit ${currentStep}/${totalProducts}...`;
+    }
+    if (phase === "analyzing") {
+      return `Analyse produit ${currentStep}/${totalProducts}...`;
+    }
+    return "";
+  }
+
+  async function handleAddAsins() {
     const asins = asinInput
       .split(/[\s,;]+/)
       .map((a) => a.trim())
@@ -95,9 +122,6 @@ export function TabProducts({ guideId, products, onRefresh }: TabProductsProps) 
     setAsinInput("");
     setAdding(false);
     onRefresh();
-
-    // Lance le scraping automatiquement
-    handleLaunchScrape();
   }
 
   async function handleRemove(productId: string) {
@@ -112,13 +136,16 @@ export function TabProducts({ guideId, products, onRefresh }: TabProductsProps) 
   async function handleLaunchScrape() {
     setScraping(true);
     setScrapeError(null);
-    setScrapeStatus("Démarrage…");
+    setPhase("scraping");
+    setCurrentStep(0);
+    setTotalProducts(products.length);
 
     const res = await fetch(`/api/guides/${guideId}/scrape`, { method: "POST" });
     if (!res.ok) {
       const data = await res.json();
       setScrapeError(data.error || "Erreur démarrage");
       setScraping(false);
+      setPhase("idle");
       return;
     }
 
@@ -128,28 +155,32 @@ export function TabProducts({ guideId, products, onRefresh }: TabProductsProps) 
       if (!pollRes.ok) return;
       const data = await pollRes.json();
 
+      if (data.totalProducts) setTotalProducts(data.totalProducts);
+
       if (data.status === "scraping") {
-        setScrapeStatus(`Scraping produit ${data.currentStep}…`);
+        setPhase("scraping");
+        setCurrentStep(data.currentStep || 0);
       } else if (data.status === "analyzing") {
-        setScrapeStatus(`Analyse produit ${data.currentStep}…`);
+        setPhase("analyzing");
+        setCurrentStep(data.currentStep || 0);
       } else if (data.status === "products-ready") {
-        setScrapeStatus("Terminé ✓");
+        setPhase("done");
         setScraping(false);
         stopPolling();
+        setTimeout(() => setPhase("idle"), 1500);
         onRefresh();
       } else if (data.status === "error") {
         setScrapeError(data.errorMessage || "Erreur inconnue");
         setScraping(false);
+        setPhase("idle");
         stopPolling();
         onRefresh();
       }
     }, 3000);
   }
 
-  const isPolling = SCRAPING_STATUSES.includes(scrapeStatus ?? "");
-
   return (
-    <div className="space-y-4 max-w-2xl">
+    <div className="space-y-4 max-w-2xl pb-20">
       {/* Ajout ASIN */}
       <div className="space-y-2">
         <Textarea
@@ -160,29 +191,13 @@ export function TabProducts({ guideId, products, onRefresh }: TabProductsProps) 
           rows={3}
           className="resize-none"
         />
-        <div className="flex gap-2">
-          <Button size="sm" onClick={handleAddAndScrape} disabled={adding || scraping || !asinInput.trim()}>
-            {adding ? (
-              <><Loader2 className="mr-2 w-4 h-4 animate-spin" />Ajout…</>
-            ) : scraping ? (
-              <><Loader2 className="mr-2 w-4 h-4 animate-spin" />En cours…</>
-            ) : (
-              <><Plus className="mr-2 w-4 h-4" />Ajouter et lancer</>
-            )}
-          </Button>
-          {scraping && scrapeStatus && (
-            <span className="text-xs text-muted-foreground flex items-center gap-1">
-              <Loader2 className="w-3 h-3 animate-spin" />
-              {scrapeStatus}
-            </span>
+        <Button size="sm" onClick={handleAddAsins} disabled={adding || scraping || !asinInput.trim()}>
+          {adding ? (
+            <><Loader2 className="mr-2 w-4 h-4 animate-spin" />Ajout...</>
+          ) : (
+            <><Plus className="mr-2 w-4 h-4" />Ajouter les produits</>
           )}
-          {!scraping && scrapeStatus && !scrapeError && (
-            <span className="text-xs text-green-600 flex items-center">{scrapeStatus}</span>
-          )}
-          {scrapeError && (
-            <span className="text-xs text-red-600 flex items-center">{scrapeError}</span>
-          )}
-        </div>
+        </Button>
       </div>
 
       {/* Compteur produits */}
@@ -245,6 +260,53 @@ export function TabProducts({ guideId, products, onRefresh }: TabProductsProps) 
           </CardContent>
         </Card>
       ))}
+
+      {/* Bouton sticky en bas */}
+      {products.length > 0 && (
+        <div className="sticky bottom-0 z-10 -mx-6 px-6 py-3 bg-background/95 backdrop-blur-sm border-t">
+          {/* Barre de progression */}
+          {scraping && (
+            <div className="space-y-2 mb-3">
+              <div className="flex items-center justify-between text-sm">
+                <span className="flex items-center gap-2 font-medium">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  {getProgressLabel()}
+                </span>
+                <span className="text-muted-foreground">{getProgressPercent()}%</span>
+              </div>
+              <Progress value={getProgressPercent()} className="h-2" />
+            </div>
+          )}
+
+          {scrapeError && (
+            <p className="text-sm text-red-600 mb-2">{scrapeError}</p>
+          )}
+
+          <Button
+            className="w-full"
+            size="lg"
+            onClick={handleLaunchScrape}
+            disabled={scraping || products.every((p) => p.status === "done")}
+          >
+            {scraping ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Récupération en cours...
+              </>
+            ) : products.every((p) => p.status === "done") ? (
+              <>
+                <CheckCircle2 className="mr-2 h-4 w-4" />
+                Tous les produits sont récupérés
+              </>
+            ) : (
+              <>
+                <Sparkles className="mr-2 h-4 w-4" />
+                Lancer la récupération
+              </>
+            )}
+          </Button>
+        </div>
+      )}
 
       {/* Confirmation suppression */}
       <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
