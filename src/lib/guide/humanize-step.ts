@@ -2,7 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { chatCompletion } from "@/lib/ai-client";
 import { getConfigModel } from "@/lib/config";
 import { calculateCost } from "@/lib/pricing";
-import { HUMANISER_PROMPT } from "@/app/api/config/prompts/route";
+import { loadPrompt } from "./enrichment-step";
 
 /**
  * Humanise l'article V1 d'un guide pour produire la version V2.
@@ -23,11 +23,8 @@ export async function humanizeArticle(guideId: string): Promise<void> {
       data: { status: "humanizing", currentStep: 0, errorMessage: "" },
     });
 
-    // Charger le prompt humaniser depuis AppConfig
-    const promptConfig = await prisma.appConfig.findUnique({
-      where: { key: "prompt_humaniser" },
-    });
-    let prompt = promptConfig?.value || HUMANISER_PROMPT;
+    // Charger le prompt humaniser depuis Paramètres (erreur si manquant)
+    let prompt = await loadPrompt("prompt_humaniser");
 
     // Résoudre les placeholders média
     const media = guide.media;

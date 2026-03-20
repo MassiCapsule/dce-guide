@@ -1,13 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { chatCompletion } from "@/lib/ai-client";
 import { calculateCost } from "@/lib/pricing";
-import {
-  RESUME_PROMPT,
-  CHAPO_PROMPT,
-  SOMMAIRE_PROMPT,
-  FAQ_PROMPT,
-  META_PROMPT,
-} from "@/app/api/config/prompts/route";
+// Plus de fallback hardcodé — les prompts doivent être configurés dans Paramètres
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -45,14 +39,14 @@ function extractPlanSectionByName(planHtml: string, sectionName: string): string
 }
 
 /**
- * Load a prompt from AppConfig (DB). Falls back to the provided default.
+ * Load a prompt from AppConfig (DB). Throws if missing.
  */
-export async function loadPrompt(
-  key: string,
-  fallback: string
-): Promise<string> {
+export async function loadPrompt(key: string): Promise<string> {
   const row = await prisma.appConfig.findUnique({ where: { key } });
-  return row?.value?.trim() || fallback;
+  if (!row?.value?.trim()) {
+    throw new Error(`Prompt manquant dans Paramètres : "${key}". Configurez-le dans /parametres > Prompts.`);
+  }
+  return row.value.trim();
 }
 
 /**
@@ -125,7 +119,7 @@ export async function generateSummary(
   articleHtml: string,
   model: string
 ): Promise<{ summary: string; cost: number }> {
-  const template = await loadPrompt("prompt_resume", RESUME_PROMPT);
+  const template = await loadPrompt("prompt_resume");
   const prompt = template.replace(/\{article\}/g, articleHtml);
 
   const result = await chatCompletion(
@@ -172,10 +166,10 @@ export async function generateEnrichments(
   // Load all 4 prompts in parallel
   const [chapoTemplate, sommaireTemplate, faqTemplate, metaTemplate] =
     await Promise.all([
-      loadPrompt("prompt_chapo", CHAPO_PROMPT),
-      loadPrompt("prompt_sommaire", SOMMAIRE_PROMPT),
-      loadPrompt("prompt_faq", FAQ_PROMPT),
-      loadPrompt("prompt_meta", META_PROMPT),
+      loadPrompt("prompt_chapo"),
+      loadPrompt("prompt_sommaire"),
+      loadPrompt("prompt_faq"),
+      loadPrompt("prompt_meta"),
     ]);
 
   // Resolve placeholders (avec section du plan correspondante)

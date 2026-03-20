@@ -89,7 +89,10 @@ export async function analyzeReviews(
     where: { key: "prompt_analysis" },
   });
 
-  const rawPrompt = promptConfig?.value || `${DEFAULT_SYSTEM_PROMPT}\n\n${DEFAULT_USER_PROMPT}`;
+  if (!promptConfig?.value?.trim()) {
+    throw new Error('Prompt manquant dans Paramètres : "prompt_analysis". Configurez-le dans /parametres > Prompts.');
+  }
+  const rawPrompt = promptConfig.value;
 
   // Split on **User** : marker if present, otherwise use full text as user prompt
   let systemPrompt: string;
@@ -104,14 +107,14 @@ export async function analyzeReviews(
       const systemStart = rawPrompt.indexOf(":", systemMarker) + 1;
       systemPrompt = rawPrompt.slice(systemStart, userMarker).trim();
     } else {
-      systemPrompt = DEFAULT_SYSTEM_PROMPT;
+      systemPrompt = "Tu es un expert analyste produit. Tu analyses les données produit et les avis clients. Tu réponds toujours en français et en JSON valide.";
     }
     // Extract user content after **User** :
     const userStart = rawPrompt.indexOf(":", userMarker) + 1;
     userPromptTemplate = rawPrompt.slice(userStart).trim();
   } else {
-    // No markers — use whole thing as user prompt with default system
-    systemPrompt = DEFAULT_SYSTEM_PROMPT;
+    // No markers — use whole thing as user prompt
+    systemPrompt = "Tu es un expert analyste produit. Tu analyses les données produit et les avis clients. Tu réponds toujours en français et en JSON valide.";
     userPromptTemplate = rawPrompt;
   }
 

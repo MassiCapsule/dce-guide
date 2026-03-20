@@ -1,11 +1,11 @@
 import { prisma } from "@/lib/prisma";
-import { buildGenerationPrompt } from "@/lib/prompt-builder";
 import { generateStream } from "@/lib/generator";
 import { cleanHtml, countWords } from "@/lib/generator/html-formatter";
 import { distributeKeywords } from "@/lib/keywords/distributor";
 import { getConfigModel } from "@/lib/config";
 import { calculateCost } from "@/lib/pricing";
-import { generateSummary, generateEnrichments } from "./enrichment-step";
+import { generateSummary, generateEnrichments, loadPrompt } from "./enrichment-step";
+import type { Media, ProductIntelligence } from "@prisma/client";
 
 /**
  * Extrait la section HTML du plan correspondant à un produit donné.
@@ -38,6 +38,59 @@ function extractPlanSection(planHtml: string, productTitle: string): string {
   }
 
   return "";
+}
+
+/**
+ * Résout le template de génération (depuis Paramètres) avec les données produit.
+ */
+function resolveGenerationTemplate(
+  template: string,
+  media: Media,
+  intelligence: ProductIntelligence,
+  keyword: string,
+  wordCount: number,
+  keywordAllocation: { keyword: string; targetCount: number }[],
+  planSection: string
+): string {
+  const bullet = (s: string) => (s.startsWith("- ") ? s : `- ${s}`);
+
+  const parseJson = (s: string): string[] => {
+    try { return JSON.parse(s); } catch { return []; }
+  };
+
+  const doRules = parseJson(media.doRules);
+  const dontRules = parseJson(media.dontRules);
+  const forbiddenWords = parseJson(media.forbiddenWords);
+
+  const keywordsFormatted = keywordAllocation.length > 0
+    ? keywordAllocation.map((k) => `- "${k.keyword}" : ${k.targetCount} occurrence${k.targetCount > 1 ? "s" : ""}`).join("\n")
+    : keyword;
+
+  return template
+    .replace(/\{media\.name\}/g, media.name || "")
+    .replace(/\{media\.toneDescription\}/g, media.toneDescription || "")
+    .replace(/\{media\.writingStyle\}/g, media.writingStyle || "")
+    .replace(/\{media\.productStructureTemplate\}/g, media.productStructureTemplate || "")
+    .replace(/\{doRules\}/g, doRules.map(bullet).join("\n"))
+    .replace(/\{dontRules\}/g, dontRules.map(bullet).join("\n"))
+    .replace(/\{forbiddenWords\}/g, forbiddenWords.map(bullet).join("\n"))
+    .replace(/\{intelligence\.productTitle\}/g, intelligence.productTitle || "")
+    .replace(/\{intelligence\.shortTitle\}/g, intelligence.shortTitle || "")
+    .replace(/\{intelligence\.productBrand\}/g, intelligence.productBrand || "")
+    .replace(/\{intelligence\.productPrice\}/g, intelligence.productPrice || "")
+    .replace(/\{intelligence\.asin\}/g, intelligence.asin || "")
+    .replace(/\{intelligence\.positioningSummary\}/g, intelligence.positioningSummary || "")
+    .replace(/\{intelligence\.keyFeatures\}/g, parseJson(intelligence.keyFeatures).map(bullet).join("\n"))
+    .replace(/\{intelligence\.detectedUsages\}/g, parseJson(intelligence.detectedUsages).map(bullet).join("\n"))
+    .replace(/\{intelligence\.buyerProfiles\}/g, parseJson(intelligence.buyerProfiles).map(bullet).join("\n"))
+    .replace(/\{intelligence\.strengthPoints\}/g, parseJson(intelligence.strengthPoints).map(bullet).join("\n"))
+    .replace(/\{intelligence\.weaknessPoints\}/g, parseJson(intelligence.weaknessPoints).map(bullet).join("\n"))
+    .replace(/\{intelligence\.recurringProblems\}/g, parseJson(intelligence.recurringProblems).map(bullet).join("\n"))
+    .replace(/\{intelligence\.remarkableQuotes\}/g, parseJson(intelligence.remarkableQuotes).map((q) => `> "${q}"`).join("\n"))
+    .replace(/\{keyword\}/g, keyword)
+    .replace(/\{keywords\}/g, keywordsFormatted)
+    .replace(/\{wordCount\}/g, String(wordCount))
+    .replace(/\{planSection\}/g, planSection);
 }
 
 /**
@@ -96,6 +149,9 @@ export async function generateArticle(guideId: string): Promise<void> {
 
     const htmlParts: string[] = [];
 
+    // Charger le template de génération depuis Paramètres
+    const generationTemplate = await loadPrompt("prompt_generation");
+
     for (let i = 0; i < readyProducts.length; i++) {
       await prisma.guide.update({
         where: { id: guideId },
@@ -112,13 +168,14 @@ export async function generateArticle(guideId: string): Promise<void> {
 
       const planSection = extractPlanSection(guide.planHtml, rp.intelligence.productTitle);
 
-      const prompt = buildGenerationPrompt(
+      const prompt = resolveGenerationTemplate(
+        generationTemplate,
         guide.media,
         rp.intelligence,
         primaryKeyword,
         guide.media.defaultProductWordCount,
         allocation,
-        planSection || undefined
+        planSection
       );
 
       const { stream, getUsage } = await generateStream(prompt, model);
