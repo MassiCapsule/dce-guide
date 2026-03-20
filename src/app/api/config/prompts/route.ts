@@ -181,6 +181,9 @@ Le résultat final est un bloc continu et cohérent — pas deux résumés du m�
 
 Format de sortie : HTML uniquement. Le chapô dans un <p> avec la classe "chapo" (<p class="chapo">...</p>), puis l'introduction dans un ou plusieurs <p>. Pas de titres, pas de markdown.
 
+Brief du plan :
+{planSection}
+
 Mot-clé principal : {keyword}
 
 Résumé de l'article :
@@ -229,6 +232,9 @@ Proposer 10 titres H2 alternatifs :
 
 Format de sortie : HTML uniquement. Le titre en <h2>, la liste de produits en <ul><li>, les titres alternatifs en <h2>. Pas de markdown.
 
+Brief du plan :
+{planSection}
+
 Mot-clé principal : {keyword}
 
 Résumé de l'article :
@@ -254,6 +260,9 @@ Exemple :
 <h2>FAQ</h2>
 <h3>Question ici ?</h3>
 <p>Réponse de 35 mots ici.</p>
+
+Brief du plan :
+{planSection}
 
 Mot-clé principal : {keyword}
 

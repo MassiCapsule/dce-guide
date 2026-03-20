@@ -23,6 +23,28 @@ function cleanMarkdown(text: string): string {
 }
 
 /**
+ * Extrait une section du plan par son nom (ex: "Chapô", "Introduction", "FAQ").
+ * Cherche entre ::: NomSection ::: et la prochaine ::: ou la fin du texte.
+ * Supprime les balises HTML pour ne garder que le texte brut.
+ */
+function extractPlanSectionByName(planHtml: string, sectionName: string): string {
+  if (!planHtml || !sectionName) return "";
+
+  // Supprimer les balises HTML pour travailler sur le texte brut
+  const text = planHtml.replace(/<[^>]+>/g, "\n").replace(/&nbsp;/g, " ");
+
+  // Chercher la section entre ::: NomSection ::: et la prochaine :::
+  const regex = new RegExp(
+    `:::\\s*${sectionName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*:::([\\s\\S]*?)(?=:::|$)`,
+    "i"
+  );
+  const match = text.match(regex);
+  if (!match) return "";
+
+  return match[1].trim();
+}
+
+/**
  * Load a prompt from AppConfig (DB). Falls back to the provided default.
  */
 export async function loadPrompt(
@@ -40,7 +62,8 @@ export function resolveMediaPlaceholders(
   prompt: string,
   media: { name: string; toneDescription: string; writingStyle: string; forbiddenWords: string },
   keyword: string,
-  resume: string
+  resume: string,
+  planSection: string = ""
 ): string {
   let forbiddenList: string[] = [];
   try {
@@ -57,7 +80,8 @@ export function resolveMediaPlaceholders(
     .replace(/\{media\.writingStyle\}/g, media.writingStyle || "")
     .replace(/\{forbiddenWords\}/g, forbiddenFormatted)
     .replace(/\{keyword\}/g, keyword)
-    .replace(/\{resume\}/g, resume);
+    .replace(/\{resume\}/g, resume)
+    .replace(/\{planSection\}/g, planSection);
 }
 
 // ---------------------------------------------------------------------------
@@ -134,8 +158,17 @@ export async function generateEnrichments(
   summary: string,
   media: EnrichmentMedia,
   keyword: string,
-  model: string
+  model: string,
+  planHtml: string = ""
 ): Promise<{ totalCost: number }> {
+  // Extraire les sections du plan pour chaque élément
+  const chapoPlanSection = [
+    extractPlanSectionByName(planHtml, "Chapô"),
+    extractPlanSectionByName(planHtml, "Introduction"),
+  ].filter(Boolean).join("\n\n");
+  const sommairePlanSection = extractPlanSectionByName(planHtml, "Critères de sélection");
+  const faqPlanSection = extractPlanSectionByName(planHtml, "FAQ");
+
   // Load all 4 prompts in parallel
   const [chapoTemplate, sommaireTemplate, faqTemplate, metaTemplate] =
     await Promise.all([
@@ -145,10 +178,10 @@ export async function generateEnrichments(
       loadPrompt("prompt_meta", META_PROMPT),
     ]);
 
-  // Resolve placeholders
-  const chapoPrompt = resolveMediaPlaceholders(chapoTemplate, media, keyword, summary);
-  const sommairePrompt = resolveMediaPlaceholders(sommaireTemplate, media, keyword, summary);
-  const faqPrompt = resolveMediaPlaceholders(faqTemplate, media, keyword, summary);
+  // Resolve placeholders (avec section du plan correspondante)
+  const chapoPrompt = resolveMediaPlaceholders(chapoTemplate, media, keyword, summary, chapoPlanSection);
+  const sommairePrompt = resolveMediaPlaceholders(sommaireTemplate, media, keyword, summary, sommairePlanSection);
+  const faqPrompt = resolveMediaPlaceholders(faqTemplate, media, keyword, summary, faqPlanSection);
   const metaPrompt = resolveMediaPlaceholders(metaTemplate, media, keyword, summary);
 
   // 4 parallel AI calls

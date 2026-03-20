@@ -14,7 +14,6 @@ import { generateSummary, generateEnrichments } from "./enrichment-step";
 function extractPlanSection(planHtml: string, productTitle: string): string {
   if (!planHtml || !productTitle) return "";
 
-  // Normalise pour la comparaison (minuscules, sans ponctuation excessive)
   const normalize = (s: string) => s.toLowerCase().replace(/[^\w\s]/g, " ").replace(/\s+/g, " ").trim();
   const normalizedTitle = normalize(productTitle);
 
@@ -25,12 +24,15 @@ function extractPlanSection(planHtml: string, productTitle: string): string {
   for (let i = 0; i < parts.length; i++) {
     const part = parts[i];
     if (/<h2/i.test(part)) {
-      // Extrait le texte du H2
       const h2Text = part.replace(/<[^>]+>/g, "");
       if (normalize(h2Text).includes(normalizedTitle.substring(0, 20))) {
-        // Retourne ce H2 + le contenu suivant (jusqu'au prochain H2)
-        const content = parts[i + 1] && !/<h2/i.test(parts[i + 1]) ? parts[i + 1] : "";
-        return part + content;
+        // Capturer le H2 + TOUT le contenu jusqu'au prochain H2
+        let content = part;
+        for (let j = i + 1; j < parts.length; j++) {
+          if (/<h2/i.test(parts[j])) break;
+          content += parts[j];
+        }
+        return content;
       }
     }
   }
@@ -183,7 +185,7 @@ export async function generateArticle(guideId: string): Promise<void> {
     });
 
     const { totalCost: enrichCost } = await generateEnrichments(
-      guideId, summary, guide.media, guide.title, model
+      guideId, summary, guide.media, guide.title, model, guide.planHtml
     );
     totalCost += enrichCost;
 
