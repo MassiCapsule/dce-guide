@@ -179,6 +179,8 @@ Ton et style : direct, concret et utile. Pas de superlatifs, pas de formules cre
 
 Le résultat final est un bloc continu et cohérent — pas deux résumés du même contenu.
 
+Format de sortie : HTML uniquement. Le chapô dans un <p> avec la classe "chapo" (<p class="chapo">...</p>), puis l'introduction dans un ou plusieurs <p>. Pas de titres, pas de markdown.
+
 Mot-clé principal : {keyword}
 
 Résumé de l'article :
@@ -225,6 +227,8 @@ Proposer 10 titres H2 alternatifs :
 - Éviter le jargon technique excessif
 - Privilégier les formulations qui parlent au lecteur
 
+Format de sortie : HTML uniquement. Le titre en <h2>, la liste de produits en <ul><li>, les titres alternatifs en <h2>. Pas de markdown.
+
 Mot-clé principal : {keyword}
 
 Résumé de l'article :
@@ -239,10 +243,17 @@ Mots interdits :
 Génère une FAQ de 5 questions qui respectent ces règles :
 
 0. La FAQ doit être utile aux lecteurs de cet article
-1. Question posée comme si on était sur Google ou un LLM (en gras balisé en H3)
-2. Réponses de 35 mots sans gras
+1. Question posée comme si on était sur Google ou un LLM, balisée en H3
+2. Réponses de 35 mots dans un <p>, sans gras
 3. Classé les questions du global au particulier
-4. Pas de numéro ni emoji devant les questions en gras
+4. Pas de numéro ni emoji devant les questions
+
+Format de sortie : HTML uniquement. Commence par <h2>FAQ</h2>, puis chaque question en <h3> suivie de sa réponse en <p>. Pas de markdown, pas de listes.
+
+Exemple :
+<h2>FAQ</h2>
+<h3>Question ici ?</h3>
+<p>Réponse de 35 mots ici.</p>
 
 Mot-clé principal : {keyword}
 

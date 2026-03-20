@@ -1,12 +1,13 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Loader2, ExternalLink } from "lucide-react";
+import { Loader2, ExternalLink, Sparkles } from "lucide-react";
 import { SeoScoreBar } from "@/components/editor/seo-score-bar";
 import { RichEditor } from "@/components/editor/rich-editor";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
+import { Progress } from "@/components/ui/progress";
 
 interface SeoKeyword {
   expression: string;
@@ -41,6 +42,7 @@ export function TabPlan({ guideId, initialHtml, initialCriteria, keyword, seoSco
   const [scoreError, setScoreError] = useState<string | null>(null);
   const [generating, setGenerating] = useState<boolean>(false);
   const [generateError, setGenerateError] = useState<string | null>(null);
+  const [progress, setProgress] = useState<number>(0);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Sync if parent reloads guide data
@@ -127,6 +129,7 @@ export function TabPlan({ guideId, initialHtml, initialCriteria, keyword, seoSco
     }
     setGenerating(true);
     setGenerateError(null);
+    setProgress(10);
 
     // Sauvegarde automatique des critères avant génération
     await onSaveCriteria(criteria);
@@ -136,8 +139,16 @@ export function TabPlan({ guideId, initialHtml, initialCriteria, keyword, seoSco
       const data = await res.json();
       setGenerateError(data.error || "Erreur démarrage");
       setGenerating(false);
+      setProgress(0);
       return;
     }
+
+    // Progression simulée
+    let tick = 10;
+    const progressInterval = setInterval(() => {
+      tick = Math.min(tick + 3, 90);
+      setProgress(tick);
+    }, 2000);
 
     // Polling toutes les 3s
     pollRef.current = setInterval(async () => {
@@ -146,6 +157,8 @@ export function TabPlan({ guideId, initialHtml, initialCriteria, keyword, seoSco
       const data = await pollRes.json();
 
       if (data.status === "plan-ready") {
+        clearInterval(progressInterval);
+        setProgress(100);
         setGenerating(false);
         stopPolling();
         // Fetch updated guide to get planHtml
@@ -157,17 +170,20 @@ export function TabPlan({ guideId, initialHtml, initialCriteria, keyword, seoSco
           // Calcul automatique du score SEO
           if (planHtml) handleRecalculate(planHtml);
         }
+        setTimeout(() => setProgress(0), 1500);
         onRefresh();
       } else if (data.status === "error") {
+        clearInterval(progressInterval);
         setGenerateError(data.errorMessage || "Erreur inconnue");
         setGenerating(false);
+        setProgress(0);
         stopPolling();
       }
     }, 3000);
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 pb-20">
       {/* Critères de sélection des produits */}
       <Card>
         <CardHeader>
@@ -195,19 +211,6 @@ export function TabPlan({ guideId, initialHtml, initialCriteria, keyword, seoSco
               className="w-full min-h-[120px] text-sm bg-muted p-3 rounded-md font-sans leading-relaxed resize-y border border-input focus:outline-none focus:ring-2 focus:ring-ring"
             />
           </div>
-          {generateError && (
-            <span className="text-xs text-red-600">{generateError}</span>
-          )}
-          <Button className="w-full" onClick={handleGenerate} disabled={generating}>
-            {generating ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Génération en cours…
-              </>
-            ) : (
-              "Générer le plan (IA)"
-            )}
-          </Button>
         </CardContent>
       </Card>
 
@@ -226,23 +229,65 @@ export function TabPlan({ guideId, initialHtml, initialCriteria, keyword, seoSco
 
       <RichEditor content={html} onChange={setHtml} />
 
-      <div className="flex items-center justify-end gap-2">
-        <Button
-          disabled={!html || validating}
-          onClick={async () => {
-            setValidating(true);
-            await fetch(`/api/guides/${guideId}`, {
-              method: "PATCH",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ planHtml: html }),
-            });
-            onRefresh();
-            setValidating(false);
-            onTabChange("article");
-          }}
-        >
-          {validating ? "Sauvegarde…" : "Valider le plan →"}
-        </Button>
+      {/* Boutons sticky en bas */}
+      <div className="sticky bottom-0 z-10 -mx-6 px-6 py-3 bg-background/95 backdrop-blur-sm border-t">
+        {/* Barre de progression */}
+        {generating && (
+          <div className="space-y-2 mb-3">
+            <div className="flex items-center justify-between text-sm">
+              <span className="flex items-center gap-2 font-medium">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Génération du plan en cours…
+              </span>
+              <span className="text-muted-foreground">{progress}%</span>
+            </div>
+            <Progress value={progress} className="h-2" />
+          </div>
+        )}
+
+        {generateError && (
+          <p className="text-sm text-red-600 mb-2">{generateError}</p>
+        )}
+
+        <div className="flex gap-2">
+          <Button
+            className="flex-1"
+            size="lg"
+            onClick={handleGenerate}
+            disabled={generating}
+          >
+            {generating ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Génération en cours…
+              </>
+            ) : (
+              <>
+                <Sparkles className="mr-2 h-4 w-4" />
+                Générer le plan (IA)
+              </>
+            )}
+          </Button>
+
+          <Button
+            size="lg"
+            variant="outline"
+            disabled={!html || validating}
+            onClick={async () => {
+              setValidating(true);
+              await fetch(`/api/guides/${guideId}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ planHtml: html }),
+              });
+              onRefresh();
+              setValidating(false);
+              onTabChange("article");
+            }}
+          >
+            {validating ? "Sauvegarde…" : "Valider le plan →"}
+          </Button>
+        </div>
       </div>
     </div>
   );

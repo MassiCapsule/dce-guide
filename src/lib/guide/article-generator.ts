@@ -194,6 +194,7 @@ export async function generateArticle(guideId: string): Promise<void> {
     });
 
     const guideHtml = [
+      `<h1>${guide.title}</h1>`,
       enriched?.chapoHtml,
       enriched?.sommaireHtml,
       bodyHtml,
