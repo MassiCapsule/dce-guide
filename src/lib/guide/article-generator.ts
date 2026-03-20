@@ -32,51 +32,57 @@ export function htmlToReadableText(html: string): string {
     .trim();
 }
 
+/**
+ * Vérifie si un titre produit (Amazon, souvent anglais) correspond à un titre de section du plan (français).
+ * Compare la marque et les mots significatifs.
+ */
+function titlesMatch(planTitle: string, productTitle: string): boolean {
+  const normalize = (s: string) => s.toLowerCase().replace(/[^\w\sàâäéèêëïîôùûüç&]/g, " ").replace(/\s+/g, " ").trim();
+  const planNorm = normalize(planTitle);
+  const productNorm = normalize(productTitle);
+
+  // Match direct (20 premiers caractères)
+  if (planNorm.includes(productNorm.substring(0, 20))) return true;
+  if (productNorm.includes(planNorm.substring(0, 20))) return true;
+
+  // Extraire les mots significatifs (> 2 chars) de chaque titre
+  const planWords = planNorm.split(" ").filter((w) => w.length > 2);
+  const productWords = productNorm.split(" ").filter((w) => w.length > 2);
+
+  // Compter les mots en commun
+  const commonWords = planWords.filter((w) => productWords.some((pw) => pw === w || pw.includes(w) || w.includes(pw)));
+
+  // Au moins 1 mot significatif en commun pour les noms de marque (> 5 chars)
+  const longCommon = planWords.filter((w) => w.length > 5 && productWords.some((pw) => pw === w || pw.includes(w) || w.includes(pw)));
+  if (longCommon.length >= 1) return true;
+
+  // Sinon au moins 2 mots en commun
+  return commonWords.length >= 2;
+}
+
 export function extractPlanSection(planHtml: string, productTitle: string): string {
   if (!planHtml || !productTitle) return "";
 
-  const normalize = (s: string) => s.toLowerCase().replace(/[^\w\s]/g, " ").replace(/\s+/g, " ").trim();
-  const normalizedTitle = normalize(productTitle);
+  // Chercher dans H3 (format principal) puis H2 (fallback)
+  for (const tagLevel of ["h3", "h2"] as const) {
+    const regex = new RegExp(`(<${tagLevel}[\\s\\S]*?<\\/${tagLevel}>)`, "gi");
+    const parts = planHtml.split(regex).filter(Boolean);
 
-  // Les produits sont en H3 dans le plan, les sous-titres en H4
-  // Découpe le plan par balises H3
-  const h3Regex = /(<h3[\s\S]*?<\/h3>)/gi;
-  const parts = planHtml.split(h3Regex).filter(Boolean);
-
-  for (let i = 0; i < parts.length; i++) {
-    const part = parts[i];
-    if (/<h3/i.test(part)) {
-      const h3Text = part.replace(/<[^>]+>/g, "");
-      if (normalize(h3Text).includes(normalizedTitle.substring(0, 20))) {
-        // Capturer le H3 + TOUT le contenu jusqu'au prochain H3
-        let content = part;
-        for (let j = i + 1; j < parts.length; j++) {
-          if (/<h3/i.test(parts[j])) break;
-          content += parts[j];
+    for (let i = 0; i < parts.length; i++) {
+      const part = parts[i];
+      if (new RegExp(`<${tagLevel}`, "i").test(part)) {
+        const headingText = part.replace(/<[^>]+>/g, "");
+        if (titlesMatch(headingText, productTitle)) {
+          // Capturer le heading + TOUT le contenu jusqu'au prochain heading de même niveau
+          let content = part;
+          for (let j = i + 1; j < parts.length; j++) {
+            if (new RegExp(`<${tagLevel}`, "i").test(parts[j])) break;
+            content += parts[j];
+          }
+          // Convertir les H4 en H2 (titres à reproduire)
+          content = content.replace(/<h4([^>]*)>/gi, "<h2$1>").replace(/<\/h4>/gi, "</h2>");
+          return htmlToReadableText(content);
         }
-        // Convertir les H4 en H2 (ce sont les titres que l'IA doit reproduire en H2)
-        content = content.replace(/<h4([^>]*)>/gi, "<h2$1>").replace(/<\/h4>/gi, "</h2>");
-        // Convertir en texte lisible
-        return htmlToReadableText(content);
-      }
-    }
-  }
-
-  // Fallback : chercher aussi par H2 (ancien format de plan)
-  const h2Regex = /(<h2[\s\S]*?<\/h2>)/gi;
-  const h2Parts = planHtml.split(h2Regex).filter(Boolean);
-
-  for (let i = 0; i < h2Parts.length; i++) {
-    const part = h2Parts[i];
-    if (/<h2/i.test(part)) {
-      const h2Text = part.replace(/<[^>]+>/g, "");
-      if (normalize(h2Text).includes(normalizedTitle.substring(0, 20))) {
-        let content = part;
-        for (let j = i + 1; j < h2Parts.length; j++) {
-          if (/<h2/i.test(h2Parts[j])) break;
-          content += h2Parts[j];
-        }
-        return htmlToReadableText(content);
       }
     }
   }
