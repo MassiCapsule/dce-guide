@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { type ReactNode } from 'react'
 import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
@@ -9,7 +9,7 @@ import { Table, TableRow, TableHeader, TableCell } from '@tiptap/extension-table
 import Image from '@tiptap/extension-image'
 import Link from '@tiptap/extension-link'
 import TextAlign from '@tiptap/extension-text-align'
-import { Bold, Italic, Underline as UnderlineIcon, List, ListOrdered, Table as TableIcon } from 'lucide-react'
+import { Bold, Italic, Underline as UnderlineIcon, List, ListOrdered, Table as TableIcon, Copy, Check } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
@@ -46,6 +46,8 @@ export function RichEditor({
   editable = true,
   className,
 }: RichEditorProps) {
+  const [copied, setCopied] = useState(false)
+
   const editor = useEditor({
     extensions: [
       StarterKit,
@@ -71,6 +73,15 @@ export function RichEditor({
       editor.commands.setContent(content)
     }
   }, [content, editor])
+
+  const handleCopy = () => {
+    if (!editor) return
+    const html = editor.getHTML()
+    navigator.clipboard.writeText(html).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    })
+  }
 
   if (!editor) return null
 
@@ -145,6 +156,15 @@ export function RichEditor({
                 .run(),
             <TableIcon className="h-4 w-4" />,
             'Insérer un tableau'
+          )}
+
+          <div className="w-px h-5 bg-border mx-1 self-center" />
+
+          {toolbarButton(
+            false,
+            handleCopy,
+            copied ? <Check className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4" />,
+            'Copier le HTML'
           )}
         </div>
       )}
