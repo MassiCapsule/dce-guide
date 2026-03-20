@@ -38,22 +38,44 @@ function extractPlanSection(planHtml: string, productTitle: string): string {
   const normalize = (s: string) => s.toLowerCase().replace(/[^\w\s]/g, " ").replace(/\s+/g, " ").trim();
   const normalizedTitle = normalize(productTitle);
 
-  // Découpe le plan par balises H2
-  const h2Regex = /(<h2[\s\S]*?<\/h2>)/gi;
-  const parts = planHtml.split(h2Regex).filter(Boolean);
+  // Les produits sont en H3 dans le plan, les sous-titres en H4
+  // Découpe le plan par balises H3
+  const h3Regex = /(<h3[\s\S]*?<\/h3>)/gi;
+  const parts = planHtml.split(h3Regex).filter(Boolean);
 
   for (let i = 0; i < parts.length; i++) {
     const part = parts[i];
+    if (/<h3/i.test(part)) {
+      const h3Text = part.replace(/<[^>]+>/g, "");
+      if (normalize(h3Text).includes(normalizedTitle.substring(0, 20))) {
+        // Capturer le H3 + TOUT le contenu jusqu'au prochain H3
+        let content = part;
+        for (let j = i + 1; j < parts.length; j++) {
+          if (/<h3/i.test(parts[j])) break;
+          content += parts[j];
+        }
+        // Convertir les H4 en H2 (ce sont les titres que l'IA doit reproduire en H2)
+        content = content.replace(/<h4([^>]*)>/gi, "<h2$1>").replace(/<\/h4>/gi, "</h2>");
+        // Convertir en texte lisible
+        return htmlToReadableText(content);
+      }
+    }
+  }
+
+  // Fallback : chercher aussi par H2 (ancien format de plan)
+  const h2Regex = /(<h2[\s\S]*?<\/h2>)/gi;
+  const h2Parts = planHtml.split(h2Regex).filter(Boolean);
+
+  for (let i = 0; i < h2Parts.length; i++) {
+    const part = h2Parts[i];
     if (/<h2/i.test(part)) {
       const h2Text = part.replace(/<[^>]+>/g, "");
       if (normalize(h2Text).includes(normalizedTitle.substring(0, 20))) {
-        // Capturer le H2 + TOUT le contenu jusqu'au prochain H2
         let content = part;
-        for (let j = i + 1; j < parts.length; j++) {
-          if (/<h2/i.test(parts[j])) break;
-          content += parts[j];
+        for (let j = i + 1; j < h2Parts.length; j++) {
+          if (/<h2/i.test(h2Parts[j])) break;
+          content += h2Parts[j];
         }
-        // Convertir en texte lisible pour que l'IA comprenne la structure
         return htmlToReadableText(content);
       }
     }
