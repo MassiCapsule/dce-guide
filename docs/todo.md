@@ -9,4 +9,5 @@
 - [ ] **Produits** : une fois terminé, afficher un bouton "Créer le plan" qui passe à l'onglet Plan
 - [ ] **Plan** : notification navigateur quand le plan est généré
 - [ ] **Plan** : une fois le plan généré, afficher un bouton "Passer à l'article" qui passe à l'onglet Article
-- [ ] **Plan** : une fois le plan généré, envoyer le contenu à Serpmantics pour récupérer le score SEO automatiquement
+- [ ] **Score SEO par étape** : calculer et stocker un score Serpmantics séparé pour le plan, l'article V1 et l'article V2. A chaque génération, pousser automatiquement le contenu dans Serpmantics et mettre à jour uniquement le score de la partie concernée (pas les autres)
+- [ ] **Plan structuré JSON** : générer un JSON structuré en plus du HTML pour fiabiliser l'extraction des sections (voir docs/idees.md)
