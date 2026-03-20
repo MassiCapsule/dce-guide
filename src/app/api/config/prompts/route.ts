@@ -202,7 +202,7 @@ La sélection doit commencer par un titre H2 personnalisé, suivie d'une liste �
 
 > Structure exacte à respecter pour chaque sélection :
 
-1. Titre principal au format : "Notre sélection de #NomduProduit pour #promesse" (en H2)
+1. Titre principal en H2 : un titre éditorialisé qui intègre le mot-clé principal "{keyword}" avec les bons accords grammaticaux. Exemple : "Notre sélection des meilleurs mousseurs à lait pour des cappuccinos maison réussis"
 
 2. Liste à puces avec pour chaque produit :
    - **Nom du produit** (en gras uniquement) : description complète en une phrase URL complète en clair qui commence par un qualificatif

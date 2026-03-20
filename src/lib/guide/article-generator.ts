@@ -193,8 +193,12 @@ export async function generateArticle(guideId: string): Promise<void> {
       select: { chapoHtml: true, sommaireHtml: true, faqHtml: true },
     });
 
+    // Extraire le H1 du plan (premier <h1> trouvé), sinon fallback sur guide.title
+    const h1Match = guide.planHtml.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i);
+    const h1Title = h1Match ? h1Match[0] : `<h1>${guide.title}</h1>`;
+
     const guideHtml = [
-      `<h1>${guide.title}</h1>`,
+      h1Title,
       enriched?.chapoHtml,
       enriched?.sommaireHtml,
       bodyHtml,
