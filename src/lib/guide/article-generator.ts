@@ -280,12 +280,17 @@ export async function generateArticle(guideId: string): Promise<void> {
         rp.intelligence.productTitle
       );
 
+      // Nombre de mots : depuis le plan JSON (mots_total), fallback 800
+      const planData = parsePlanJson(guide.planJson);
+      const planProduct = planData?.produits.find((p) => p.asin === rp.intelligence.asin);
+      const targetWordCount = planProduct?.mots_total || 800;
+
       const prompt = resolveGenerationTemplate(
         generationTemplate,
         guide.media,
         rp.intelligence,
         primaryKeyword,
-        guide.media.defaultProductWordCount,
+        targetWordCount,
         [],
         planSection,
         forbiddenFormatted

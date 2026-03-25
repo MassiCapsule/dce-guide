@@ -45,7 +45,6 @@ interface MediaFormProps {
     doRules: string;
     dontRules: string;
     productStructureTemplate: string;
-    defaultProductWordCount: number;
     promptPlan: string;
     planOutputStructure: string;
     modelPlan: string;
@@ -82,9 +81,6 @@ export function MediaForm({ media }: MediaFormProps) {
   const [productStructureTemplate, setProductStructureTemplate] = useState(
     media?.productStructureTemplate ?? ""
   );
-  const [defaultProductWordCount, setDefaultProductWordCount] = useState(
-    media?.defaultProductWordCount ?? 800
-  );
   const [promptPlan, setPromptPlan] = useState(media?.promptPlan ?? "");
   const [planOutputStructure, setPlanOutputStructure] = useState(media?.planOutputStructure ?? "");
   const [modelPlan, setModelPlan] = useState(media?.modelPlan || "__global__");
@@ -112,7 +108,6 @@ export function MediaForm({ media }: MediaFormProps) {
         doRules: JSON.stringify(doRulesArray),
         dontRules: JSON.stringify(dontRulesArray),
         productStructureTemplate,
-        defaultProductWordCount,
         promptPlan,
         planOutputStructure,
         modelPlan: modelPlan === "__global__" ? "" : modelPlan,
@@ -246,21 +241,6 @@ export function MediaForm({ media }: MediaFormProps) {
             </p>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="defaultProductWordCount">
-              Nombre de mots par defaut
-            </Label>
-            <Input
-              id="defaultProductWordCount"
-              type="number"
-              value={defaultProductWordCount}
-              onChange={(e) =>
-                setDefaultProductWordCount(parseInt(e.target.value) || 0)
-              }
-              min={100}
-              max={5000}
-            />
-          </div>
 
           <div className="space-y-2">
             <Label htmlFor="modelPlan">Modèle IA pour le plan</Label>

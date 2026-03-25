@@ -55,9 +55,6 @@ export default async function MediasPage() {
                       {media.toneDescription || "Pas de description du ton"}
                     </CardDescription>
                   </div>
-                  <Badge variant="secondary">
-                    {media.defaultProductWordCount} mots
-                  </Badge>
                 </CardHeader>
                 <CardContent>
                   <div className="flex items-center gap-2">

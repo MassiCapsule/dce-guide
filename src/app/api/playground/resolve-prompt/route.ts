@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { loadPrompt, loadForbiddenWords, formatForbiddenWords } from "@/lib/guide/enrichment-step";
 import { extractPlanSectionFromJson, resolveGenerationTemplate } from "@/lib/guide/article-generator";
+import { parsePlanJson } from "@/lib/guide/plan-types";
 
 export async function POST(req: NextRequest) {
   try {
@@ -46,13 +47,18 @@ export async function POST(req: NextRequest) {
       intelligence.productTitle
     );
 
+    // Nombre de mots : depuis le plan JSON (mots_total), fallback 800
+    const planData = parsePlanJson(guide.planJson);
+    const planProduct = planData?.produits.find((p) => p.asin === intelligence.asin);
+    const wordCount = planProduct?.mots_total || 800;
+
     // Résoudre le template avec toutes les données
     const resolvedPrompt = resolveGenerationTemplate(
       template,
       guide.media,
       intelligence,
       guide.title,
-      guide.media.defaultProductWordCount,
+      wordCount,
       [],
       planSection,
       forbiddenFormatted

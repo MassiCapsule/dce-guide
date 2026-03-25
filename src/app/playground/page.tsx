@@ -39,7 +39,6 @@ interface PromptSegment {
 interface MediaOption {
   id: string;
   name: string;
-  defaultProductWordCount: number;
 }
 
 function ModelSelect({ value, onChange }: { value: string; onChange: (v: string) => void }) {
