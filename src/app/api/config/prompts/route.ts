@@ -279,13 +279,15 @@ Mots interdits :
 Rédige la section "Critères de sélection" du guide d'achat. Cette section explique au lecteur les critères concrets utilisés pour comparer et sélectionner les produits présentés dans l'article.
 
 ::: Consignes :::
-- Commence par le titre H2 fourni dans le brief du plan (ne pas en inventer un autre)
+- Reprends le titre H2 EXACTEMENT tel qu'il est dans le brief du plan — ne le modifie pas, ne le reformule pas, ne corrige pas les éventuelles fautes
+- Rédige UNIQUEMENT les critères listés dans le brief du plan — ne pas en ajouter, ne pas en supprimer, ne pas en reformuler
 - Présente chaque critère comme un repère concret pour un lecteur sans expertise
 - Relie chaque critère à un bénéfice direct d'usage
 - Utilise la structure indiquée dans le brief (liste à puces ou paragraphes selon le plan)
-- Chaque critère : nom en gras suivi d'une explication concrète en une ou deux phrases
+- Chaque critère : nom en gras suivi de deux-points puis d'une explication en minuscule (pas de majuscule après les deux-points)
 - Pas de jargon technique sans explication immédiate
 - Intègre naturellement les mots-clés SEO fournis
+- Respecte le nombre de mots indiqué dans le brief
 
 ::: Format de sortie :::
 HTML uniquement. Le titre en <h2>, puis les critères selon la structure demandée (liste <ul><li> ou paragraphes <p>). Pas de markdown, pas d'images.
