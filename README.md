@@ -95,3 +95,19 @@ Après chaque génération (article V1, V2, relance intro+FAQ), trois correction
 2. **Majuscule en début de phrase** — Après un point `.`, un point d'exclamation `!` ou un point d'interrogation `?`, la lettre suivante est forcée en majuscule.
 
 3. **Minuscule après les deux-points** — Après le signe `:`, la lettre suivante est forcée en minuscule. Si un nom propre se retrouve en minuscule par erreur, il faut le corriger manuellement dans l'éditeur.
+
+4. **Majuscule en début de titre** — Le premier caractère de chaque H1, H2 et H3 est forcé en majuscule (corrige les noms de marques en minuscule comme "eufy" → "Eufy" en début de titre).
+
+5. **Gras forcé sur le chapô** — Le contenu du `<p class="chapo">` est automatiquement enveloppé dans `<strong>`, que l'IA l'ait mis en gras ou non.
+
+---
+
+## Paramètres IA par étape
+
+| Étape | Température | Modèle |
+|-------|-------------|--------|
+| Chapô + Introduction | 0.9 | `model_generation` |
+| Sommaire, Critères, FAQ, Méta | 0.7 | `model_generation` |
+| Fiches produits | 0.7 | `model_generation` |
+| Résumé | 0.7 | `model_generation` |
+| Humanisation (V2) | 0.7 | `model_humanization` |
