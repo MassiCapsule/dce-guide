@@ -49,14 +49,14 @@ export function extractPlanSectionFromJson(
     return "";
   }
 
-  let text = `## ${product["Titre H2"]}\n`;
+  let text = `## ${product["Titre H2"]} (H2)\n`;
   text += `Brief : ${product.Brief}\n\n`;
 
   text += `PARTIE 1 – Situation (sans titre visible)\n`;
   text += `Brief : ${product.parties.situation.brief}\n\n`;
 
   if (product.parties.atouts.h2) {
-    text += `## ${product.parties.atouts.h2}\n`;
+    text += `### ${product.parties.atouts.h2} (H3)\n`;
   }
   text += `Brief : ${product.parties.atouts.brief}\n`;
   if (product.parties.atouts.points?.length) {
@@ -65,12 +65,12 @@ export function extractPlanSectionFromJson(
   text += "\n";
 
   if (product.parties.valeur.h2) {
-    text += `## ${product.parties.valeur.h2}\n`;
+    text += `### ${product.parties.valeur.h2} (H3)\n`;
   }
   text += `Brief : ${product.parties.valeur.brief}\n\n`;
 
   if (product.parties.evidence.h2) {
-    text += `## ${product.parties.evidence.h2}\n`;
+    text += `### ${product.parties.evidence.h2} (H3)\n`;
   }
   text += `Brief : ${product.parties.evidence.brief}\n\n`;
 
