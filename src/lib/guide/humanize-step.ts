@@ -39,7 +39,7 @@ export async function humanizeArticle(guideId: string): Promise<void> {
     prompt = prompt.replace(/\{\{fiche_produit_v1\}\}/g, guide.guideHtml);
 
     // Appel IA
-    const model = await getConfigModel("generation");
+    const model = await getConfigModel("humanization");
     const result = await chatCompletion(model, [
       { role: "system", content: prompt },
       { role: "user", content: "Réécris l'article complet en suivant les instructions ci-dessus. Conserve la structure HTML et les balises." },

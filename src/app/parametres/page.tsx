@@ -32,18 +32,18 @@ const ANTHROPIC_MODELS = MODELS.filter((m) => m.provider === "Anthropic");
 
 type PromptKey = "generation" | "analysis" | "criteres" | "humaniser" | "resume" | "chapo" | "sommaire" | "criteres_selection" | "faq" | "meta" | "forbidden_words";
 
-const PROMPT_TABS: { key: PromptKey; label: string; hasModel: boolean }[] = [
-  { key: "criteres", label: "Criteres Perplexity", hasModel: false },
-  { key: "analysis", label: "Analyse", hasModel: true },
-  { key: "generation", label: "Generation", hasModel: true },
-  { key: "resume", label: "Resume", hasModel: false },
-  { key: "chapo", label: "Chapo + Intro", hasModel: false },
-  { key: "sommaire", label: "Sommaire", hasModel: false },
-  { key: "criteres_selection", label: "Criteres selection", hasModel: false },
-  { key: "faq", label: "FAQ", hasModel: false },
-  { key: "meta", label: "Meta + Slug", hasModel: false },
-  { key: "humaniser", label: "Humaniser", hasModel: false },
-  { key: "forbidden_words", label: "Interdits lexicaux", hasModel: false },
+const PROMPT_TABS: { key: PromptKey; label: string }[] = [
+  { key: "criteres", label: "Criteres Perplexity" },
+  { key: "analysis", label: "Analyse" },
+  { key: "generation", label: "Generation" },
+  { key: "resume", label: "Resume" },
+  { key: "chapo", label: "Chapo + Intro" },
+  { key: "sommaire", label: "Sommaire" },
+  { key: "criteres_selection", label: "Criteres selection" },
+  { key: "faq", label: "FAQ" },
+  { key: "meta", label: "Meta + Slug" },
+  { key: "humaniser", label: "Humaniser" },
+  { key: "forbidden_words", label: "Interdits lexicaux" },
 ];
 
 function ModelSelector({ value, onChange }: { value: string; onChange: (v: string) => void }) {
@@ -91,9 +91,9 @@ export default function ParametresPage() {
   const [promptSaved, setPromptSaved] = useState(false);
   const [readmeContent, setReadmeContent] = useState<string>("");
 
-  // Per-prompt models
+  // Global models (2 only)
   const [modelGeneration, setModelGeneration] = useState("gpt-4o");
-  const [modelAnalysis, setModelAnalysis] = useState("gpt-4o");
+  const [modelHumanization, setModelHumanization] = useState("gpt-4o");
   // API keys
   const [openaiKey, setOpenaiKey] = useState("");
   const [anthropicKey, setAnthropicKey] = useState("");
@@ -108,11 +108,9 @@ export default function ParametresPage() {
     fetch("/api/config")
       .then((r) => r.json())
       .then((data) => {
-        // Per-prompt models (fallback to legacy openai_model)
         const fallbackModel = data.openai_model || "gpt-4o";
         setModelGeneration(data.model_generation || fallbackModel);
-        setModelAnalysis(data.model_analysis || fallbackModel);
-        // model_plan is now configured per-media, not globally
+        setModelHumanization(data.model_humanization || data.model_generation || fallbackModel);
         if (data.prompt_generation) setGenerationPrompt(data.prompt_generation);
         if (data.prompt_analysis) setAnalysisPrompt(data.prompt_analysis);
         if (data.prompt_criteres) setCriteresPrompt(data.prompt_criteres);
@@ -159,20 +157,14 @@ export default function ParametresPage() {
     });
   };
 
-  const handleModelChange = (purpose: PromptKey, value: string) => {
-    if (purpose === "generation") {
-      setModelGeneration(value);
-      saveModelForPrompt("model_generation", value);
-    } else if (purpose === "analysis") {
-      setModelAnalysis(value);
-      saveModelForPrompt("model_analysis", value);
-    }
+  const handleModelGenerationChange = (value: string) => {
+    setModelGeneration(value);
+    saveModelForPrompt("model_generation", value);
   };
 
-  const getCurrentModel = (tab: PromptKey) => {
-    if (tab === "generation") return modelGeneration;
-    if (tab === "analysis") return modelAnalysis;
-    return "";
+  const handleModelHumanizationChange = (value: string) => {
+    setModelHumanization(value);
+    saveModelForPrompt("model_humanization", value);
   };
 
   const savePrompt = useCallback(async () => {
@@ -282,7 +274,6 @@ export default function ParametresPage() {
     else if (tab === "forbidden_words") setForbiddenWordsText(value);
   };
 
-  const currentTabConfig = PROMPT_TABS.find((t) => t.key === promptTab)!;
 
   return (
     <>
@@ -335,17 +326,6 @@ export default function ParametresPage() {
                     ))}
                   </div>
 
-                  {/* Model selector per prompt */}
-                  {currentTabConfig.hasModel && (
-                    <div className="flex items-center gap-3">
-                      <Label className="text-xs text-muted-foreground whitespace-nowrap">Modele :</Label>
-                      <ModelSelector
-                        value={getCurrentModel(promptTab)}
-                        onChange={(v) => handleModelChange(promptTab, v)}
-                      />
-                    </div>
-                  )}
-
                   {/* Prompt textarea or forbidden words textarea */}
                   {promptTab === "forbidden_words" ? (
                     <div className="space-y-2">
@@ -375,7 +355,28 @@ export default function ParametresPage() {
 
           {/* Onglet Cles API */}
           <TabsContent value="keys">
-            <div className="max-w-xl">
+            <div className="max-w-xl space-y-6">
+              {/* Modèles IA */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Modeles IA</CardTitle>
+                  <CardDescription>Modele utilise pour chaque etape du pipeline.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-1.5">
+                    <Label>Modele Article (V1)</Label>
+                    <p className="text-xs text-muted-foreground">Utilise pour l&apos;analyse, le plan, les fiches et les enrichissements.</p>
+                    <ModelSelector value={modelGeneration} onChange={handleModelGenerationChange} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Modele Humanisation (V2)</Label>
+                    <p className="text-xs text-muted-foreground">Utilise uniquement pour la reecriture de l&apos;article V1 en V2.</p>
+                    <ModelSelector value={modelHumanization} onChange={handleModelHumanizationChange} />
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Clés API */}
               <Card>
                 <CardHeader>
                   <CardTitle className="text-base">Cles API</CardTitle>

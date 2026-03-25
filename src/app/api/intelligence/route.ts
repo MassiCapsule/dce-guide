@@ -33,7 +33,7 @@ export async function POST(req: Request) {
     const product = mapRawProduct(rawProductItem);
     const reviews = mapRawReviews(rawReviewItems);
 
-    const model = await getConfigModel("analysis");
+    const model = await getConfigModel("generation");
     const result = await analyzeReviews(product, reviews, model);
     const cost = calculateCost(model, result.promptTokens, result.completionTokens);
 

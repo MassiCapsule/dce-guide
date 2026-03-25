@@ -55,8 +55,7 @@ export async function POST(req: NextRequest) {
     // Resolve prompt template: media.promptPlan > DEFAULT_PLAN_PROMPT
     const promptTemplate = guide.media?.promptPlan?.trim() || DEFAULT_PLAN_PROMPT;
 
-    // Resolve model: media.modelPlan > global model_plan
-    const modelPlan = guide.media?.modelPlan?.trim() || await getConfigModel("plan");
+    const modelPlan = await getConfigModel("generation");
 
     // Load forbidden words from AppConfig
     const bullet = (s: string) => s.startsWith("- ") ? s : `- ${s}`;

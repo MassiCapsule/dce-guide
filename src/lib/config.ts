@@ -1,29 +1,30 @@
 import { prisma } from "@/lib/prisma";
 
-export type ModelPurpose = "generation" | "analysis" | "plan";
+export type ModelPurpose = "generation" | "humanization";
 
 const MODEL_CONFIG_KEYS: Record<ModelPurpose, string> = {
   generation: "model_generation",
-  analysis: "model_analysis",
-  plan: "model_plan",
+  humanization: "model_humanization",
 };
 
 /**
  * Get the configured model for a specific purpose.
- * Falls back to the legacy `openai_model` key, then to "gpt-4o".
+ * - "generation" : used for all steps (analysis, plan, article, enrichments)
+ * - "humanization" : used for V2 humanization only
  */
-export async function getConfigModel(purpose?: ModelPurpose): Promise<string> {
-  // Try purpose-specific key first
-  if (purpose) {
-    const specific = await prisma.appConfig.findUnique({
-      where: { key: MODEL_CONFIG_KEYS[purpose] },
+export async function getConfigModel(purpose: ModelPurpose): Promise<string> {
+  const specific = await prisma.appConfig.findUnique({
+    where: { key: MODEL_CONFIG_KEYS[purpose] },
+  });
+  if (specific?.value) return specific.value;
+
+  // Fallback: if humanization not set, use generation model
+  if (purpose === "humanization") {
+    const gen = await prisma.appConfig.findUnique({
+      where: { key: MODEL_CONFIG_KEYS.generation },
     });
-    if (specific?.value) return specific.value;
+    if (gen?.value) return gen.value;
   }
 
-  // Fallback to legacy global key
-  const global = await prisma.appConfig.findUnique({
-    where: { key: "openai_model" },
-  });
-  return global?.value || "gpt-4o";
+  return "gpt-4o";
 }
