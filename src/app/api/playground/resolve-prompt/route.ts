@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { loadPrompt } from "@/lib/guide/enrichment-step";
+import { loadPrompt, loadForbiddenWords, formatForbiddenWords } from "@/lib/guide/enrichment-step";
 import { extractPlanSectionFromJson, resolveGenerationTemplate } from "@/lib/guide/article-generator";
 
 export async function POST(req: NextRequest) {
@@ -31,8 +31,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Produit introuvable" }, { status: 404 });
     }
 
-    // Charger le template depuis Paramètres
-    const template = await loadPrompt("prompt_generation");
+    // Charger le template + mots interdits depuis Paramètres
+    const [template, forbiddenWords] = await Promise.all([
+      loadPrompt("prompt_generation"),
+      loadForbiddenWords(),
+    ]);
+    const forbiddenFormatted = formatForbiddenWords(forbiddenWords);
 
     // Extraire la section du plan pour ce produit (JSON prioritaire, fallback HTML)
     const planSection = extractPlanSectionFromJson(
@@ -50,7 +54,8 @@ export async function POST(req: NextRequest) {
       guide.title,
       guide.media.defaultProductWordCount,
       [],
-      planSection
+      planSection,
+      forbiddenFormatted
     );
 
     return NextResponse.json({

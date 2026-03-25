@@ -58,12 +58,13 @@ export async function POST(req: NextRequest) {
     // Resolve model: media.modelPlan > global model_plan
     const modelPlan = guide.media?.modelPlan?.trim() || await getConfigModel("plan");
 
-    // Parse forbidden words from media
+    // Load forbidden words from AppConfig
     const bullet = (s: string) => s.startsWith("- ") ? s : `- ${s}`;
     let forbiddenWords = "";
-    if (guide.media?.forbiddenWords) {
+    const fwRow = await prisma.appConfig.findUnique({ where: { key: "forbidden_words" } });
+    if (fwRow?.value) {
       try {
-        const words: string[] = JSON.parse(guide.media.forbiddenWords);
+        const words: string[] = JSON.parse(fwRow.value);
         forbiddenWords = words.map(bullet).join("\n");
       } catch { /* ignore parse errors */ }
     }

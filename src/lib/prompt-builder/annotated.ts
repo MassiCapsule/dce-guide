@@ -21,7 +21,8 @@ export function buildAnnotatedFromTemplate(
   intelligence: ProductIntelligence,
   keyword: string,
   wordCount: number,
-  planSection?: string
+  planSection?: string,
+  forbiddenWords: string[] = []
 ): AnnotatedPrompt {
   // Parse JSON string fields
   const parseJson = (str: string): string[] => {
@@ -50,7 +51,7 @@ export function buildAnnotatedFromTemplate(
     "{media.productStructureTemplate}": media.productStructureTemplate || "",
     "{doRules}": doRules.map(bullet).join("\n"),
     "{dontRules}": dontRules.map(bullet).join("\n"),
-    "{forbiddenWords}": parseJson(media.forbiddenWords).map(bullet).join("\n"),
+    "{forbiddenWords}": forbiddenWords.map(bullet).join("\n"),
 
     // Product Intelligence
     "{intelligence.productTitle}": intelligence.productTitle,

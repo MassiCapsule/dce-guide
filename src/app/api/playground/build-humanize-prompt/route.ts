@@ -33,11 +33,14 @@ export async function POST(req: NextRequest) {
     prompt = prompt.replace(/\{media\.toneDescription\}/g, media.toneDescription || "");
     prompt = prompt.replace(/\{media\.writingStyle\}/g, media.writingStyle || "");
 
-    // Replace forbidden words
-    let forbiddenWords: string[] = [];
-    try { forbiddenWords = JSON.parse(media.forbiddenWords); } catch { forbiddenWords = []; }
+    // Replace forbidden words (from AppConfig)
     const bullet = (s: string) => s.startsWith("- ") ? s : `- ${s}`;
-    prompt = prompt.replace(/\{forbiddenWords\}/g, forbiddenWords.map(bullet).join("\n"));
+    const fwRow = await prisma.appConfig.findUnique({ where: { key: "forbidden_words" } });
+    let forbiddenWords: string[] = [];
+    if (fwRow?.value) {
+      try { forbiddenWords = JSON.parse(fwRow.value); } catch { forbiddenWords = []; }
+    }
+    prompt = prompt.replace(/\{forbiddenWords\}/g, forbiddenWords.length > 0 ? forbiddenWords.map(bullet).join("\n") : "(aucun)");
 
     // Replace the HTML V1 placeholder
     prompt = prompt.replace(/\{\{fiche_produit_v1\}\}/g, htmlV1);

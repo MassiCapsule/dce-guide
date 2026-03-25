@@ -2,7 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { chatCompletion } from "@/lib/ai-client";
 import { getConfigModel } from "@/lib/config";
 import { calculateCost } from "@/lib/pricing";
-import { loadPrompt } from "./enrichment-step";
+import { loadPrompt, loadForbiddenWords, formatForbiddenWords } from "./enrichment-step";
 
 /**
  * Humanise l'article V1 d'un guide pour produire la version V2.
@@ -31,11 +31,9 @@ export async function humanizeArticle(guideId: string): Promise<void> {
     prompt = prompt.replace(/\{media\.toneDescription\}/g, media.toneDescription || "");
     prompt = prompt.replace(/\{media\.writingStyle\}/g, media.writingStyle || "");
 
-    // Mots interdits
-    let forbiddenWords: string[] = [];
-    try { forbiddenWords = JSON.parse(media.forbiddenWords); } catch { forbiddenWords = []; }
-    const bullet = (s: string) => s.startsWith("- ") ? s : `- ${s}`;
-    prompt = prompt.replace(/\{forbiddenWords\}/g, forbiddenWords.map(bullet).join("\n"));
+    // Mots interdits (depuis AppConfig)
+    const forbiddenWords = await loadForbiddenWords();
+    prompt = prompt.replace(/\{forbiddenWords\}/g, formatForbiddenWords(forbiddenWords));
 
     // Injecter l'article V1
     prompt = prompt.replace(/\{\{fiche_produit_v1\}\}/g, guide.guideHtml);

@@ -49,7 +49,6 @@ interface MediaFormProps {
     promptPlan: string;
     planOutputStructure: string;
     modelPlan: string;
-    forbiddenWords: string;
   };
 }
 
@@ -89,14 +88,6 @@ export function MediaForm({ media }: MediaFormProps) {
   const [promptPlan, setPromptPlan] = useState(media?.promptPlan ?? "");
   const [planOutputStructure, setPlanOutputStructure] = useState(media?.planOutputStructure ?? "");
   const [modelPlan, setModelPlan] = useState(media?.modelPlan || "__global__");
-  const [forbiddenWords, setForbiddenWords] = useState(() => {
-    if (!media?.forbiddenWords) return "";
-    try {
-      return JSON.parse(media.forbiddenWords).join("\n");
-    } catch {
-      return media.forbiddenWords;
-    }
-  });
   const [submitting, setSubmitting] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -113,11 +104,6 @@ export function MediaForm({ media }: MediaFormProps) {
         .map((r: string) => r.trim())
         .filter((r: string) => r.length > 0);
 
-      const forbiddenWordsArray = forbiddenWords
-        .split("\n")
-        .map((r: string) => r.trim())
-        .filter((r: string) => r.length > 0);
-
       const body = {
         name,
         description,
@@ -125,7 +111,6 @@ export function MediaForm({ media }: MediaFormProps) {
         writingStyle,
         doRules: JSON.stringify(doRulesArray),
         dontRules: JSON.stringify(dontRulesArray),
-        forbiddenWords: JSON.stringify(forbiddenWordsArray),
         productStructureTemplate,
         defaultProductWordCount,
         promptPlan,
@@ -258,23 +243,6 @@ export function MediaForm({ media }: MediaFormProps) {
             />
             <p className="text-xs text-muted-foreground">
               Une regle par ligne
-            </p>
-          </div>
-
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <Label htmlFor="forbiddenWords">Interdits lexicaux</Label>
-              <Badge variant="secondary" className="font-mono text-xs">{"{forbiddenWords}"}</Badge>
-            </div>
-            <Textarea
-              id="forbiddenWords"
-              value={forbiddenWords}
-              onChange={(e) => setForbiddenWords(e.target.value)}
-              placeholder="Un mot ou expression par ligne"
-              rows={5}
-            />
-            <p className="text-xs text-muted-foreground">
-              Mots et expressions a ne jamais utiliser dans les contenus generes (un par ligne)
             </p>
           </div>
 

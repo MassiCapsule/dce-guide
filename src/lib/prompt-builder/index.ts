@@ -11,7 +11,8 @@ export function buildGenerationPrompt(
   keyword: string,
   wordCount: number,
   keywordAllocation?: KeywordAllocationItem[],
-  planSection?: string
+  planSection?: string,
+  forbiddenWords: string[] = []
 ): string {
   // Parse JSON string fields from media
   let doRules: string[] = [];
@@ -27,13 +28,6 @@ export function buildGenerationPrompt(
     dontRules = JSON.parse(media.dontRules);
   } catch {
     dontRules = [];
-  }
-
-  let forbiddenWords: string[] = [];
-  try {
-    forbiddenWords = JSON.parse(media.forbiddenWords);
-  } catch {
-    forbiddenWords = [];
   }
 
   // Parse JSON string fields from intelligence
