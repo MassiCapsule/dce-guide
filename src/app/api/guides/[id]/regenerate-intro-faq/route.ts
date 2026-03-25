@@ -25,7 +25,7 @@ async function reassembleArticle(guideId: string): Promise<string> {
       faqHtml: true,
       products: {
         orderBy: { position: "asc" },
-        include: { generatedCard: true },
+        include: { generatedCard: true, intelligence: true },
       },
     },
   });
@@ -38,7 +38,16 @@ async function reassembleArticle(guideId: string): Promise<string> {
     : (guide.planHtml.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i)?.[0] || `<h1>${guide.title}</h1>`);
 
   const bodyHtml = guide.products
-    .map((p) => p.generatedCard?.contentHtml || "")
+    .map((p) => {
+      const cardHtml = p.generatedCard?.contentHtml || "";
+      if (!cardHtml) return "";
+      const imageUrl = p.intelligence?.productImageUrl;
+      if (!imageUrl) return cardHtml;
+      return cardHtml.replace(
+        /(<h2[^>]*>[\s\S]*?<\/h2>)/i,
+        `$1\n<img src="${imageUrl}" alt="${p.intelligence?.shortTitle || p.intelligence?.productTitle || ""}" />`
+      );
+    })
     .filter(Boolean)
     .join("\n\n");
 

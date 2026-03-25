@@ -269,7 +269,15 @@ export async function generateArticle(guideId: string): Promise<void> {
         data: { generatedCardId: card.id },
       });
 
-      htmlParts.push(cleaned);
+      // Injecter l'image produit après le premier H2
+      const imageUrl = rp.intelligence.productImageUrl;
+      const withImage = imageUrl
+        ? cleaned.replace(
+            /(<h2[^>]*>[\s\S]*?<\/h2>)/i,
+            `$1\n<img src="${imageUrl}" alt="${rp.intelligence.shortTitle || rp.intelligence.productTitle}" />`
+          )
+        : cleaned;
+      htmlParts.push(withImage);
     }
 
     // --- RÉSUMÉ ---
