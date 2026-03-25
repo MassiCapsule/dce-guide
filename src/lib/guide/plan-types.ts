@@ -27,7 +27,7 @@ export interface PlanProductPart {
 export interface PlanProduct {
   asin: string;
   "Titre H2": string;
-  Brief: string;
+  Brief?: string;
   parties: {
     situation: PlanProductPart;
     atouts: PlanProductPart;

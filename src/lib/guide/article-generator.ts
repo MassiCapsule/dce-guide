@@ -50,7 +50,10 @@ export function extractPlanSectionFromJson(
   }
 
   let text = `## ${product["Titre H2"]} (H2)\n`;
-  text += `Brief : ${product.Brief}\n\n`;
+  if (product.Brief) {
+    text += `Brief : ${product.Brief}\n`;
+  }
+  text += "\n";
 
   text += `PARTIE 1 – Situation (sans titre visible)\n`;
   text += `Brief : ${product.parties.situation.brief}\n\n`;
