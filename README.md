@@ -49,7 +49,7 @@ Dans l'onglet **Article**, cliquer sur **Générer l'article (IA)**.
 Le pipeline se lance automatiquement :
 1. **Génération des fiches produits** — une par une, en suivant le brief du plan pour chaque produit
 2. **Résumé de l'article** — ~200 mots, utilisé comme contexte pour les éléments suivants
-3. **4 éléments en parallèle** — chapô + introduction, sommaire, FAQ, meta + slug (chacun reçoit la section du plan correspondante)
+3. **5 éléments en parallèle** — chapô + introduction, sommaire, critères de sélection, FAQ, meta + slug (chacun reçoit la section du plan correspondante : briefs, items, liste produits)
 4. **Assemblage final** — H1 (extrait du plan) + chapô + sommaire + fiches produits + FAQ
 
 Les éléments SEO (slug, meta title, meta description, légende photo) sont pré-remplis par l'IA et modifiables dans le collapsible "Eléments SEO".

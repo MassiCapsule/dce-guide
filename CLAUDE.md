@@ -101,10 +101,10 @@ Générateur de guides d'achat SEO avec fiches produits Amazon.
 | `src/lib/keywords/distributor.ts` | Distribution mots-clés entre produits |
 | `src/lib/guide/pipeline.ts` | (legacy) Pipeline complet monolithique |
 | `src/lib/guide/scrape-step.ts` | Scraping Apify + analyse IA (modèle `model_generation`) + tri par prix croissant — status: scraping → analyzing → products-ready |
-| `src/lib/guide/plan-types.ts` | Types TypeScript pour le plan JSON structuré + helper `parsePlanJson()` |
+| `src/lib/guide/plan-types.ts` | Types TypeScript pour le plan JSON structuré (`PlanSection`, `PlanSectionItem`, `PlanProduct`) + helper `parsePlanJson()` |
 | `src/lib/guide/plan-generator.ts` | Génération du plan IA (modèle `model_generation`) — double sortie HTML + JSON — status: generating-plan → plan-ready |
 | `src/lib/guide/article-generator.ts` | Génération fiches (template DB `prompt_generation`, nb mots depuis `planJson.mots_total`) + résumé + enrichissements + assemblage + post-traitement bold — status: generating → summarizing → enriching → complete |
-| `src/lib/guide/enrichment-step.ts` | Enrichissement article : résumé, chapô+intro, sommaire, critères sélection, FAQ, méta — 5 appels parallèles. Helpers `loadForbiddenWords()` + `formatForbiddenWords()` + `stripBoldFromBody()`. Extraction sections depuis JSON uniquement (plus de fallback HTML) |
+| `src/lib/guide/enrichment-step.ts` | Enrichissement article : résumé, chapô+intro, sommaire, critères sélection, FAQ, méta — 5 appels parallèles. Helpers `loadForbiddenWords()` + `formatForbiddenWords()` + `stripBoldFromBody()`. Extraction sections depuis JSON : `extractSectionFromJson()` (chapô brief, intro brief, critères items, FAQ questions) + `extractProductListFromJson()` (liste produits pour sommaire) |
 | `src/lib/guide/humanize-step.ts` | Humanisation article V1 → V2 via prompt `prompt_humaniser` (modèle `model_humanization`) + post-traitement bold — status: humanizing → complete |
 | `src/lib/prompt-builder/index.ts` | (legacy) Ancien prompt builder hardcodé — **plus utilisé par le pipeline**, remplacé par le template DB `prompt_generation` |
 | `src/lib/prompt-builder/annotated.ts` | Construit un prompt annoté depuis un template (placeholders → segments avec badges) pour le Playground |
@@ -162,10 +162,10 @@ Générateur de guides d'achat SEO avec fiches produits Amazon.
 | `prompt_criteres` | Prompt Perplexity pour générer les critères (placeholder `#MotClesprincipal`) |
 | `prompt_humaniser` | Prompt template pour humaniser les fiches produits — placeholders : `{media.toneDescription}`, `{media.writingStyle}`, `{{fiche_produit_v1}}` |
 | `prompt_resume` | Prompt pour résumer l'article — placeholder : `{article}` |
-| `prompt_chapo` | Prompt chapô (30 mots) + introduction (100 mots) — placeholders : `{media.name}`, `{media.toneDescription}`, `{media.writingStyle}`, `{forbiddenWords}`, `{keyword}`, `{resume}`, `{planSection}` (= sections `::: Chapô :::` + `::: Introduction :::` du plan) |
-| `prompt_sommaire` | Prompt sommaire / sélection produits — mêmes placeholders + `{planSection}` (= section `::: Critères de sélection :::` du plan) |
-| `prompt_criteres_selection` | Prompt critères de sélection — mêmes placeholders + `{planSection}` (= section critères du plan) |
-| `prompt_faq` | Prompt FAQ 5 questions — mêmes placeholders + `{planSection}` (= section `::: FAQ :::` du plan) |
+| `prompt_chapo` | Prompt chapô (30 mots) + introduction (100 mots) — placeholders : `{media.name}`, `{media.toneDescription}`, `{media.writingStyle}`, `{forbiddenWords}`, `{keyword}`, `{resume}`, `{planSection}` (= brief + mots-clés du chapô et de l'introduction depuis le plan JSON) |
+| `prompt_sommaire` | Prompt sommaire / sélection produits — mêmes placeholders + `{planSection}` (= liste des produits avec nom, prix, URL depuis le plan JSON) |
+| `prompt_criteres_selection` | Prompt critères de sélection — mêmes placeholders + `{planSection}` (= brief + items numérotés des critères depuis le plan JSON) |
+| `prompt_faq` | Prompt FAQ — mêmes placeholders + `{planSection}` (= brief + questions numérotées depuis le plan JSON) |
 | `prompt_meta` | Prompt meta title + meta description + légende + slug — mêmes placeholders (sans `{planSection}`) |
 | `forbidden_words` | Interdits lexicaux (JSON string array) — mots/expressions à ne jamais utiliser. Placeholder `{forbiddenWords}` dans les prompts |
 | `openai_api_key` | Clé API OpenAI (saisie depuis /parametres > Clés API) |
@@ -403,7 +403,8 @@ Le plan-generator demande à l'IA de produire **deux sorties** : le HTML (pour l
 
 **Fonctions d'extraction** :
 - `extractPlanSectionFromJson()` (article-generator) : extrait la section plan d'un produit par ASIN
-- `extractSectionFromJson()` (enrichment-step) : extrait chapô, introduction, critères, FAQ par clé JSON
+- `extractSectionFromJson()` (enrichment-step) : extrait chapô (brief + mots-clés), introduction (brief + mots-clés), critères (brief + items numérotés), FAQ (brief + questions numérotées) par clé JSON
+- `extractProductListFromJson()` (enrichment-step) : extrait la liste des produits (nom, prix, URL) pour le sommaire
 - `parsePlanJson()` (plan-types) : parse et valide le JSON
 
 ---
@@ -584,3 +585,9 @@ Champs **retirés de l'UI média** (restent en DB) : `productStructureTemplate`,
 | 2026-03-25 | Simplification modèles IA : 2 sélecteurs dans Paramètres > Clés API — "Modèle Article (V1)" (`model_generation`) et "Modèle Humanisation (V2)" (`model_humanization`) |
 | 2026-03-25 | Suppression sélecteurs modèle par prompt (Paramètres > Prompts) et sélecteur `modelPlan` du formulaire média |
 | 2026-03-25 | Clés `model_analysis`, `model_plan`, `openai_model` supprimées — tout le pipeline V1 utilise `model_generation` |
+| 2026-03-25 | Plan JSON enrichi : `items` sur critères (liste des critères individuels), `items` sur FAQ (questions à traiter), `brief` sur chapô et introduction (angle éditorial) |
+| 2026-03-25 | Type `PlanSectionItem` ajouté à plan-types.ts (`{ nom, description }`) + champ `items` optionnel sur `PlanSection` |
+| 2026-03-25 | Extraction enrichie dans enrichment-step.ts : chapô/intro extraient le brief, critères extraient les items numérotés, FAQ extrait les questions numérotées |
+| 2026-03-25 | Nouvelle fonction `extractProductListFromJson()` — injecte la liste produits (nom, prix, URL) dans le `{planSection}` du sommaire |
+| 2026-03-25 | Prompts renforcés (critères + FAQ) : interdiction d'ajouter/supprimer/fusionner des éléments, ordre exact du plan, pas de "vous"/"nous comparons" |
+| 2026-03-25 | `planOutputStructure` du média mis à jour : `criteres.items`, `faq.items`, `chapo.brief`, `introduction.brief` + règles JSON associées |

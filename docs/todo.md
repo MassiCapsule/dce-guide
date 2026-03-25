@@ -15,6 +15,6 @@
 - [ ] **Article — Titre FAQ** : le prompt FAQ doit générer un titre H2 éditorialisé (avec le mot-clé principal) avant les questions
 - [x] **Optimisation coûts** : modèle IA configurable — désormais 2 modèles (V1 + V2) dans Paramètres > Clés API. L'utilisateur choisit le modèle adapté
 - [ ] **Distribution mots-clés** : actuellement commentée — les mots-clés sont gérés par le plan via `{planSection}`. Réactiver si le score SEO Serpmantics est insuffisant
-- [ ] **Fiches produits — vérification process** : vérifier que le pipeline de génération des fiches respecte bien le plan (H2 exacts, briefs suivis, pas de contamination entre produits, bon prix/URL par fiche)
+- [x] **Fiches produits — vérification process** : vérifier que le pipeline de génération des fiches respecte bien le plan — corrigé le 2026-03-25 (plan JSON enrichi : items critères, questions FAQ, briefs chapô/intro, liste produits sommaire)
 - [ ] **Estimation coût article** : calculer le coût total d'une rédaction complète (ajout produits → scraping → analyse → plan → article V1 → enrichissements → humanisation V2), basé sur le modèle et le nombre de produits
 - [ ] **Structuration prompts et données** : réorganiser ce qui est commun à tous les médias (prompts dans Paramètres, logique pipeline) vs ce qui est propre à un média (ton, style, règles, prompt plan, modèle plan). Clarifier la frontière pour faciliter l'ajout de nouveaux médias
