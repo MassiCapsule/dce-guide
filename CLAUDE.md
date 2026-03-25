@@ -298,8 +298,8 @@ Au submit du formulaire de création :
 | `/guides/nouveau` | Formulaire création guide (keyword + media uniquement) |
 | `/guides/[id]` | Détail guide : 5 onglets (Vue d'ensemble, Produits, Plan, Article, Article V2) avec vraies données API |
 | `/medias` | Profils éditoriaux (ton, style, template) |
-| `/produits` | Produits scrappés |
-| `/intelligence` | Analyses IA structurées |
+| `/produits` | Produits scrappés (page existante mais **retirée du menu** — redondante avec /intelligence) |
+| `/intelligence` | Produits : données scrappées + analyses IA structurées |
 | `/playground` | Playground : sélecteur guide → produit → prompt résolu complet → génération V1 → humanisation V2 |
 | `/parametres` | Config runtime : 3 onglets — Prompts (11 sous-onglets dont Interdits lexicaux), Clés API (2 sélecteurs modèle IA + 4 clés API), Doc |
 
@@ -591,3 +591,6 @@ Champs **retirés de l'UI média** (restent en DB) : `productStructureTemplate`,
 | 2026-03-25 | Nouvelle fonction `extractProductListFromJson()` — injecte la liste produits (nom, prix, URL) dans le `{planSection}` du sommaire |
 | 2026-03-25 | Prompts renforcés (critères + FAQ) : interdiction d'ajouter/supprimer/fusionner des éléments, ordre exact du plan, pas de "vous"/"nous comparons" |
 | 2026-03-25 | `planOutputStructure` du média mis à jour : `criteres.items`, `faq.items`, `chapo.brief`, `introduction.brief` + règles JSON associées |
+| 2026-03-25 | Fix balisage titres fiches : `extractPlanSectionFromJson()` envoie le titre produit en `## (H2)` et les sous-parties SAVE en `### (H3)` — l'IA respecte le niveau exact |
+| 2026-03-25 | Prompt `prompt_generation` : instruction "BALISAGE" remplace "TITRES H2", h1 retiré des balises autorisées (le H1 est ajouté uniquement à l'assemblage final) |
+| 2026-03-25 | Retrait de `/produits` (Fiches produit) du menu sidebar — `/intelligence` (Produits) suffit, les données brutes scrappées sont redondantes |
