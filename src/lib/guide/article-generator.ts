@@ -329,7 +329,7 @@ export async function generateArticle(guideId: string): Promise<void> {
     ].filter(Boolean).join("\n\n");
 
     // Post-traitements
-    const guideHtml = fixCapitalization(stripBoldFromBody(guideHtmlRaw));
+    const guideHtml = fixCapitalization(stripBoldFromBody(guideHtmlRaw), guide.title);
 
     const guideWordCount = countWords(guideHtml);
 

@@ -60,7 +60,7 @@ async function reassembleArticle(guideId: string): Promise<string> {
     guide.faqHtml,
   ].filter(Boolean).join("\n\n");
 
-  return fixCapitalization(stripBoldFromBody(guideHtmlRaw));
+  return fixCapitalization(stripBoldFromBody(guideHtmlRaw), guide.title);
 }
 
 /**
@@ -71,7 +71,8 @@ async function reassembleArticle(guideId: string): Promise<string> {
 function replaceIntroAndFaqInHtml(
   existingHtml: string,
   newChapoHtml: string,
-  newFaqHtml: string
+  newFaqHtml: string,
+  keyword: string = ""
 ): string {
   let result = existingHtml;
 
@@ -88,7 +89,7 @@ function replaceIntroAndFaqInHtml(
     result = result.replace(faqPattern, newFaqHtml);
   }
 
-  return fixCapitalization(stripBoldFromBody(result));
+  return fixCapitalization(stripBoldFromBody(result), keyword);
 }
 
 export async function POST(req: Request, { params }: RouteParams) {
@@ -153,7 +154,8 @@ export async function POST(req: Request, { params }: RouteParams) {
           const newV2 = replaceIntroAndFaqInHtml(
             updatedGuide.guideHtmlV2,
             updatedGuide.chapoHtml || "",
-            updatedGuide.faqHtml || ""
+            updatedGuide.faqHtml || "",
+            guide.title
           );
 
           await prisma.guide.update({

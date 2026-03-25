@@ -30,7 +30,7 @@ const MODELS = [
 const OPENAI_MODELS = MODELS.filter((m) => m.provider === "OpenAI");
 const ANTHROPIC_MODELS = MODELS.filter((m) => m.provider === "Anthropic");
 
-type PromptKey = "generation" | "analysis" | "criteres" | "humaniser" | "resume" | "chapo" | "sommaire" | "criteres_selection" | "faq" | "meta" | "forbidden_words";
+type PromptKey = "generation" | "analysis" | "criteres" | "humaniser" | "resume" | "chapo" | "sommaire" | "criteres_selection" | "faq" | "meta" | "forbidden_words" | "postprod";
 
 const PROMPT_TABS: { key: PromptKey; label: string }[] = [
   { key: "criteres", label: "Criteres Perplexity" },
@@ -44,6 +44,7 @@ const PROMPT_TABS: { key: PromptKey; label: string }[] = [
   { key: "meta", label: "Meta + Slug" },
   { key: "humaniser", label: "Humaniser" },
   { key: "forbidden_words", label: "Interdits lexicaux" },
+  { key: "postprod", label: "Post-traitement" },
 ];
 
 function ModelSelector({ value, onChange }: { value: string; onChange: (v: string) => void }) {
@@ -326,8 +327,72 @@ export default function ParametresPage() {
                     ))}
                   </div>
 
-                  {/* Prompt textarea or forbidden words textarea */}
-                  {promptTab === "forbidden_words" ? (
+                  {/* Prompt textarea, forbidden words, or post-processing info */}
+                  {promptTab === "postprod" ? (
+                    <div className="space-y-4 text-sm p-4 bg-muted/30 rounded-lg">
+                      <p className="text-muted-foreground">
+                        Ces traitements sont appliques automatiquement apres chaque generation (V1, V2, relance Intro+FAQ). Ils ne sont pas editables.
+                      </p>
+
+                      <div className="space-y-3">
+                        <div className="border-l-2 border-primary pl-3">
+                          <p className="font-medium">1. Suppression du gras dans le corps</p>
+                          <p className="text-muted-foreground text-xs">Les balises &lt;strong&gt; sont retirees partout sauf dans les titres (H1-H6) et le chapo.</p>
+                        </div>
+
+                        <div className="border-l-2 border-primary pl-3">
+                          <p className="font-medium">2. Suppression des italiques</p>
+                          <p className="text-muted-foreground text-xs">Toutes les balises &lt;em&gt; sont retirees du contenu.</p>
+                        </div>
+
+                        <div className="border-l-2 border-primary pl-3">
+                          <p className="font-medium">3. Majuscule en debut de phrase</p>
+                          <p className="text-muted-foreground text-xs">Apres un point, un point d&apos;exclamation ou un point d&apos;interrogation, la lettre suivante est forcee en majuscule.</p>
+                        </div>
+
+                        <div className="border-l-2 border-primary pl-3">
+                          <p className="font-medium">4. Minuscule apres les deux-points</p>
+                          <p className="text-muted-foreground text-xs">Apres le signe &quot;:&quot;, la lettre suivante est forcee en minuscule. Corriger manuellement si nom propre.</p>
+                        </div>
+
+                        <div className="border-l-2 border-primary pl-3">
+                          <p className="font-medium">5. Majuscule en debut de titre</p>
+                          <p className="text-muted-foreground text-xs">Le premier caractere de chaque H1, H2 et H3 est force en majuscule.</p>
+                        </div>
+
+                        <div className="border-l-2 border-primary pl-3">
+                          <p className="font-medium">6. Gras force sur le chapo</p>
+                          <p className="text-muted-foreground text-xs">Le contenu du &lt;p class=&quot;chapo&quot;&gt; est automatiquement enveloppe dans &lt;strong&gt;.</p>
+                        </div>
+
+                        <div className="border-l-2 border-primary pl-3">
+                          <p className="font-medium">7. Liens Amazon avec tag affilie</p>
+                          <p className="text-muted-foreground text-xs">Les URLs Amazon sont transformees en : amazon.fr/dp/ASIN?tag=dce-motcle-DDMMYY-21</p>
+                        </div>
+
+                        <div className="border-l-2 border-primary pl-3">
+                          <p className="font-medium">8. Bouton &quot;VOIR SUR AMAZON&quot;</p>
+                          <p className="text-muted-foreground text-xs">Un &lt;p&gt;&lt;strong&gt;VOIR SUR AMAZON&lt;/strong&gt;&lt;/p&gt; est ajoute apres chaque ligne URL + prix.</p>
+                        </div>
+
+                        <div className="border-l-2 border-primary pl-3">
+                          <p className="font-medium">9. Image produit apres le H2</p>
+                          <p className="text-muted-foreground text-xs">L&apos;image Amazon du produit est inseree automatiquement apres le titre H2 de chaque fiche.</p>
+                        </div>
+                      </div>
+
+                      <div className="mt-4 p-3 bg-muted rounded-md">
+                        <p className="font-medium text-xs mb-1">Temperatures IA</p>
+                        <div className="grid grid-cols-2 gap-1 text-xs text-muted-foreground">
+                          <span>Chapo + Introduction</span><span className="font-mono">0.9</span>
+                          <span>Meta + H1 (slug, titre, legende)</span><span className="font-mono">0.9</span>
+                          <span>Sommaire, Criteres, FAQ</span><span className="font-mono">0.7</span>
+                          <span>Fiches produits, Resume</span><span className="font-mono">0.7</span>
+                          <span>Humanisation (V2)</span><span className="font-mono">0.7</span>
+                        </div>
+                      </div>
+                    </div>
+                  ) : promptTab === "forbidden_words" ? (
                     <div className="space-y-2">
                       <p className="text-xs text-muted-foreground">
                         Mots et expressions a ne jamais utiliser dans les contenus generes (un par ligne). Variable : <code className="bg-muted-foreground/10 px-1 rounded">{"{forbiddenWords}"}</code>

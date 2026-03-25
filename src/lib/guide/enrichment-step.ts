@@ -51,7 +51,7 @@ export function stripBoldFromBody(html: string): string {
  * - Minuscule après ":"
  * Ne touche pas le contenu des balises HTML.
  */
-export function fixCapitalization(html: string): string {
+export function fixCapitalization(html: string, keyword: string = ""): string {
   // 1. Majuscule sur le premier caractère des titres H1/H2/H3
   let result = html.replace(
     /(<h[1-3][^>]*>)([a-zà-ö])/gi,
@@ -82,7 +82,26 @@ export function fixCapitalization(html: string): string {
     }
   );
 
-  // 4. Ajouter bouton "VOIR SUR AMAZON" après la ligne URL + prix (si pas déjà présent)
+  // 4. Transformer les URLs Amazon avec tag affilié
+  if (keyword) {
+    const kwSlug = keyword
+      .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // retirer accents
+      .replace(/[\s-]+/g, "") // retirer espaces et tirets
+      .toLowerCase();
+    const now = new Date();
+    const dd = String(now.getDate()).padStart(2, "0");
+    const mm = String(now.getMonth() + 1).padStart(2, "0");
+    const yy = String(now.getFullYear()).slice(-2);
+    const datePart = `${dd}${mm}${yy}`;
+    const tag = `dce-${kwSlug}-${datePart}-21`;
+
+    result = result.replace(
+      /https:\/\/www\.amazon\.fr\/dp\/([A-Z0-9]+)(\?[^\s"<]*)*/gi,
+      `https://www.amazon.fr/dp/$1?tag=${tag}`
+    );
+  }
+
+  // 5. Ajouter bouton "VOIR SUR AMAZON" après la ligne URL + prix (si pas déjà présent)
   result = result.replace(
     /(<p>(?:[^<]*)?https:\/\/www\.amazon\.fr\/dp\/[A-Z0-9]+[^<]*<\/p>)(?!\s*<p><strong>VOIR SUR AMAZON<\/strong><\/p>)/gi,
     '$1\n<p><strong>VOIR SUR AMAZON</strong></p>'
