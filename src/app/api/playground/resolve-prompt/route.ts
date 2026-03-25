@@ -50,7 +50,7 @@ export async function POST(req: NextRequest) {
     // Nombre de mots : depuis le plan JSON (mots_total), fallback 800
     const planData = parsePlanJson(guide.planJson);
     const planProduct = planData?.produits.find((p) => p.asin === intelligence.asin);
-    const wordCount = planProduct?.mots_total || 800;
+    const wordCount = planProduct?.mots_total || 250;
 
     // Résoudre le template avec toutes les données
     const resolvedPrompt = resolveGenerationTemplate(
