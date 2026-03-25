@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { chatCompletion } from "@/lib/ai-client";
 import { calculateCost } from "@/lib/pricing";
+import { parsePlanJson } from "./plan-types";
 // Plus de fallback hardcodé — les prompts doivent être configurés dans Paramètres
 
 // ---------------------------------------------------------------------------
@@ -119,6 +120,79 @@ function extractCriteriaPlanSection(planHtml: string): string {
 }
 
 /**
+ * Extrait une section du plan depuis le JSON structuré.
+ * Fallback sur l'ancien parsing HTML si planJson est vide.
+ */
+function extractSectionFromJson(
+  planJsonStr: string | null | undefined,
+  planHtml: string,
+  sectionName: string
+): string {
+  const plan = parsePlanJson(planJsonStr);
+
+  if (plan) {
+    const key = sectionName.toLowerCase()
+      .normalize("NFD").replace(/[\u0300-\u036f]/g, ""); // Remove accents
+
+    if (key === "chapo" && plan.chapo) {
+      let text = "";
+      if (plan.chapo.mots_cles?.length) {
+        text += `Mots-clés : ${plan.chapo.mots_cles.join(", ")}\n`;
+      }
+      if (plan.chapo.nombre_mots) {
+        text += `Nombre de mots : ${plan.chapo.nombre_mots}\n`;
+      }
+      return text.trim();
+    }
+
+    if (key === "introduction" && plan.introduction) {
+      let text = "";
+      if (plan.introduction.mots_cles?.length) {
+        text += `Mots-clés : ${plan.introduction.mots_cles.join(", ")}\n`;
+      }
+      if (plan.introduction.nombre_mots) {
+        text += `Nombre de mots : ${plan.introduction.nombre_mots}\n`;
+      }
+      return text.trim();
+    }
+
+    if (key === "criteres" && plan.criteres) {
+      let text = "";
+      if (plan.criteres["Titre H2"]) {
+        text += `## ${plan.criteres["Titre H2"]}\n`;
+      }
+      if (plan.criteres.brief) {
+        text += `Brief : ${plan.criteres.brief}\n`;
+      }
+      if (plan.criteres.mots_cles?.length) {
+        text += `Mots-clés : ${plan.criteres.mots_cles.join(", ")}\n`;
+      }
+      if (plan.criteres.nombre_mots) {
+        text += `Nombre de mots : ${plan.criteres.nombre_mots}\n`;
+      }
+      if (plan.criteres.structure) {
+        text += `Structure : ${plan.criteres.structure}\n`;
+      }
+      return text.trim();
+    }
+
+    if (key === "faq" && plan.faq) {
+      let text = "";
+      if (plan.faq.mots_cles?.length) {
+        text += `Mots-clés : ${plan.faq.mots_cles.join(", ")}\n`;
+      }
+      return text.trim();
+    }
+  }
+
+  // Fallback HTML
+  if (sectionName.toLowerCase().includes("critère") || sectionName.toLowerCase().includes("critere")) {
+    return extractCriteriaPlanSection(planHtml);
+  }
+  return extractPlanSectionByName(planHtml, sectionName);
+}
+
+/**
  * Load a prompt from AppConfig (DB). Throws if missing.
  */
 export async function loadPrompt(key: string): Promise<string> {
@@ -233,16 +307,16 @@ export async function generateEnrichments(
   media: EnrichmentMedia,
   keyword: string,
   model: string,
-  planHtml: string = ""
+  planHtml: string = "",
+  planJson: string = ""
 ): Promise<{ totalCost: number }> {
-  // Extraire les sections du plan pour chaque élément
+  // Extraire les sections du plan pour chaque élément (JSON prioritaire, fallback HTML)
   const chapoPlanSection = [
-    extractPlanSectionByName(planHtml, "Chapô"),
-    extractPlanSectionByName(planHtml, "Introduction"),
+    extractSectionFromJson(planJson, planHtml, "Chapô"),
+    extractSectionFromJson(planJson, planHtml, "Introduction"),
   ].filter(Boolean).join("\n\n");
-  // Les critères sont le H2 entre Introduction et Fiches produits (titre variable)
-  const sommairePlanSection = extractCriteriaPlanSection(planHtml);
-  const faqPlanSection = extractPlanSectionByName(planHtml, "FAQ");
+  const sommairePlanSection = extractSectionFromJson(planJson, planHtml, "Critères");
+  const faqPlanSection = extractSectionFromJson(planJson, planHtml, "FAQ");
 
   // Load all 4 prompts in parallel
   const [chapoTemplate, sommaireTemplate, faqTemplate, metaTemplate] =

@@ -165,12 +165,78 @@ export async function generatePlan(guideId: string): Promise<void> {
       .replace(/#ResumeProduits/g, resumeProduits || "Aucun produit")
       .replace(/#MotsCles/g, motsCles || "Aucun mot-clé");
 
-    const completion = await chatCompletion(model, [
-      { role: "system", content: prompt },
-      { role: "user", content: "Génère le plan du guide d'achat." },
-    ], { temperature: 0.7, maxTokens: 8192 });
+    // Instructions JSON ajoutées après le prompt média
+    const jsonInstructions = `
 
-    const planHtml = completion.content.replace(/^```html\s*/i, "").replace(/\s*```$/, "").trim();
+// SORTIE DOUBLE OBLIGATOIRE
+Après le plan HTML complet, vous devez produire un bloc JSON structuré entre les balises :::JSON_START::: et :::JSON_END:::
+
+Le JSON doit suivre exactement cette structure :
+{
+  "H1": { "titre": "Le titre H1 du plan" },
+  "chapo": { "mots_cles": ["mot1", "mot2"], "nombre_mots": 30 },
+  "introduction": { "mots_cles": ["mot1", "mot2"], "nombre_mots": 100 },
+  "criteres": { "Titre H2": "Titre H2 des critères", "brief": "Brief de la section critères", "mots_cles": ["mot1"], "nombre_mots": 200, "structure": "liste a puces" },
+  "produits": [
+    {
+      "asin": "ASIN_DU_PRODUIT",
+      "Titre H2": "Titre H2 éditorial du produit",
+      "Brief": "Brief éditorial global de la fiche produit",
+      "parties": {
+        "situation": { "brief": "Brief de la scène de vie" },
+        "atouts": { "h2": "Titre H2 de la partie Atout", "brief": "Brief de la partie Atout", "points": ["élément1", "élément2"] },
+        "valeur": { "h2": "Titre H2 de la partie Valeur", "brief": "Brief de la partie Valeur" },
+        "evidence": { "h2": "Titre H2 de la partie Évidence", "brief": "Brief de la partie Évidence" }
+      },
+      "mots_cles": ["mot1", "mot2"],
+      "mots_total": 350,
+      "prix": "prix en clair",
+      "url": "https://www.amazon.fr/dp/ASIN_DU_PRODUIT"
+    }
+  ],
+  "faq": { "mots_cles": ["mot1", "mot2"] }
+}
+
+IMPORTANT pour le JSON :
+- L'ASIN de chaque produit doit correspondre EXACTEMENT aux ASINs fournis dans les données produits
+- L'URL doit être au format https://www.amazon.fr/dp/{ASIN}
+- Les produits doivent être dans le même ordre que dans le plan HTML
+- Le JSON reflète fidèlement le contenu du plan HTML
+- Les briefs dans "parties" décrivent ce que chaque section doit contenir
+- "atouts.points" liste les éléments concrets et visibles du produit
+- "situation" n'a PAS de h2 (pas de titre visible)
+`;
+
+    const finalPrompt = prompt + jsonInstructions;
+
+    const completion = await chatCompletion(model, [
+      { role: "system", content: finalPrompt },
+      { role: "user", content: "Génère le plan du guide d'achat." },
+    ], { temperature: 0.7, maxTokens: 16384 });
+
+    const rawContent = completion.content;
+
+    // Extraire le JSON structuré
+    let planJson = "";
+    const jsonMatch = rawContent.match(/:::JSON_START:::([\s\S]*?):::JSON_END:::/);
+    if (jsonMatch) {
+      try {
+        const parsed = JSON.parse(jsonMatch[1].trim());
+        planJson = JSON.stringify(parsed);
+      } catch (e) {
+        console.warn("Plan JSON invalide, fallback HTML seul:", e);
+      }
+    } else {
+      console.warn("Bloc JSON non trouvé dans la réponse du plan");
+    }
+
+    // Extraire le HTML (tout avant :::JSON_START::: ou tout si pas de JSON)
+    let planHtml = rawContent;
+    if (jsonMatch) {
+      planHtml = rawContent.substring(0, rawContent.indexOf(":::JSON_START:::"));
+    }
+    planHtml = planHtml.replace(/^```html\s*/i, "").replace(/\s*```$/, "").trim();
+
     const promptTokens = completion.promptTokens;
     const completionTokens = completion.completionTokens;
     const cost = calculateCost(model, promptTokens, completionTokens);
@@ -179,6 +245,7 @@ export async function generatePlan(guideId: string): Promise<void> {
       where: { id: guideId },
       data: {
         planHtml,
+        planJson,
         status: "plan-ready",
         currentStep: 0,
         guidePromptTokens: promptTokens,

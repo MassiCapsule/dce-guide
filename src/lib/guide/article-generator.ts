@@ -5,6 +5,7 @@ import { distributeKeywords } from "@/lib/keywords/distributor";
 import { getConfigModel } from "@/lib/config";
 import { calculateCost } from "@/lib/pricing";
 import { generateSummary, generateEnrichments, loadPrompt } from "./enrichment-step";
+import { parsePlanJson } from "./plan-types";
 import type { Media, ProductIntelligence } from "@prisma/client";
 
 /**
@@ -88,6 +89,62 @@ export function extractPlanSection(planHtml: string, productTitle: string): stri
   }
 
   return "";
+}
+
+/**
+ * Extrait la section du plan pour un produit via son ASIN (match exact depuis planJson).
+ * Fallback sur l'ancien parsing HTML si planJson est vide.
+ */
+export function extractPlanSectionFromJson(
+  planJsonStr: string | null | undefined,
+  planHtml: string,
+  asin: string,
+  productTitle: string
+): string {
+  const plan = parsePlanJson(planJsonStr);
+
+  if (plan) {
+    const product = plan.produits.find((p) => p.asin === asin);
+    if (product) {
+      let text = `## ${product["Titre H2"]}\n`;
+      text += `Brief : ${product.Brief}\n\n`;
+
+      text += `PARTIE 1 – Situation (sans titre visible)\n`;
+      text += `Brief : ${product.parties.situation.brief}\n\n`;
+
+      if (product.parties.atouts.h2) {
+        text += `## ${product.parties.atouts.h2}\n`;
+      }
+      text += `Brief : ${product.parties.atouts.brief}\n`;
+      if (product.parties.atouts.points?.length) {
+        text += `Points : ${product.parties.atouts.points.join(", ")}\n`;
+      }
+      text += "\n";
+
+      if (product.parties.valeur.h2) {
+        text += `## ${product.parties.valeur.h2}\n`;
+      }
+      text += `Brief : ${product.parties.valeur.brief}\n\n`;
+
+      if (product.parties.evidence.h2) {
+        text += `## ${product.parties.evidence.h2}\n`;
+      }
+      text += `Brief : ${product.parties.evidence.brief}\n\n`;
+
+      if (product.mots_cles?.length) {
+        text += `Mots-clés secondaires : ${product.mots_cles.join(", ")}\n`;
+      }
+      text += `Nombre de mots : ${product.mots_total}\n`;
+      text += `Prix : ${product.prix}\n`;
+      text += `URL marchand : ${product.url}\n`;
+
+      return text.trim();
+    }
+    console.warn(`Produit ASIN ${asin} non trouvé dans planJson, fallback HTML`);
+  }
+
+  // Fallback: ancien parsing HTML
+  return extractPlanSection(planHtml, productTitle);
 }
 
 /**
@@ -212,7 +269,12 @@ export async function generateArticle(guideId: string): Promise<void> {
 
       const primaryKeyword = guide.title;
 
-      const planSection = extractPlanSection(guide.planHtml, rp.intelligence.productTitle);
+      const planSection = extractPlanSectionFromJson(
+        guide.planJson,
+        guide.planHtml,
+        rp.intelligence.asin,
+        rp.intelligence.productTitle
+      );
 
       const prompt = resolveGenerationTemplate(
         generationTemplate,
@@ -288,7 +350,7 @@ export async function generateArticle(guideId: string): Promise<void> {
     });
 
     const { totalCost: enrichCost } = await generateEnrichments(
-      guideId, summary, guide.media, guide.title, model, guide.planHtml
+      guideId, summary, guide.media, guide.title, model, guide.planHtml, guide.planJson
     );
     totalCost += enrichCost;
 
@@ -298,9 +360,11 @@ export async function generateArticle(guideId: string): Promise<void> {
       select: { chapoHtml: true, sommaireHtml: true, faqHtml: true },
     });
 
-    // Extraire le H1 du plan (premier <h1> trouvé), sinon fallback sur guide.title
-    const h1Match = guide.planHtml.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i);
-    const h1Title = h1Match ? h1Match[0] : `<h1>${guide.title}</h1>`;
+    // Extraire le H1 : JSON d'abord, sinon HTML, sinon guide.title
+    const planData = parsePlanJson(guide.planJson);
+    const h1Title = planData?.H1?.titre
+      ? `<h1>${planData.H1.titre}</h1>`
+      : (guide.planHtml.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i)?.[0] || `<h1>${guide.title}</h1>`);
 
     const guideHtml = [
       h1Title,

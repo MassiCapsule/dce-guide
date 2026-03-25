@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { loadPrompt } from "@/lib/guide/enrichment-step";
-import { extractPlanSection, resolveGenerationTemplate } from "@/lib/guide/article-generator";
+import { extractPlanSectionFromJson, resolveGenerationTemplate } from "@/lib/guide/article-generator";
 
 export async function POST(req: NextRequest) {
   try {
@@ -34,8 +34,13 @@ export async function POST(req: NextRequest) {
     // Charger le template depuis Paramètres
     const template = await loadPrompt("prompt_generation");
 
-    // Extraire la section du plan pour ce produit
-    const planSection = extractPlanSection(guide.planHtml, intelligence.productTitle);
+    // Extraire la section du plan pour ce produit (JSON prioritaire, fallback HTML)
+    const planSection = extractPlanSectionFromJson(
+      guide.planJson,
+      guide.planHtml,
+      intelligence.asin,
+      intelligence.productTitle
+    );
 
     // Résoudre le template avec toutes les données
     const resolvedPrompt = resolveGenerationTemplate(

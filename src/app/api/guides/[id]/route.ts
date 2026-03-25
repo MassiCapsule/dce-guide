@@ -36,6 +36,7 @@ export async function PATCH(req: Request, { params }: RouteParams) {
   const data: Record<string, unknown> = {};
   if (body.criteria !== undefined) data.criteria = body.criteria;
   if (body.planHtml !== undefined) data.planHtml = body.planHtml;
+  if (body.planJson !== undefined) data.planJson = body.planJson;
   if (body.slug !== undefined) data.slug = body.slug;
   if (body.metaTitle !== undefined) data.metaTitle = body.metaTitle;
   if (body.metaDescription !== undefined) data.metaDescription = body.metaDescription;

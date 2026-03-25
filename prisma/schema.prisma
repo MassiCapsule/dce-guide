@@ -109,6 +109,7 @@ model Guide {
   seoScore              Float?
   seoKeywords           String @default("[]") // JSON: [{ expression, target, current, ok }]
   planHtml              String @default("")
+  planJson              String @default("") // JSON structuré du plan
   guideHtml             String @default("")
   guideHtmlV2           String @default("")
   articleSummary        String @default("")

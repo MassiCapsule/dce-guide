@@ -66,7 +66,7 @@ Générateur de guides d'achat SEO avec fiches produits Amazon.
 |-------|---------|------|
 | `/api/guides` | POST | Créer un guide (keyword, media, criteria, keywords, wordCount, serpanticsGuideId) |
 | `/api/guides/[id]` | GET | Charger un guide complet (products.intelligence + keywords) |
-| `/api/guides/[id]` | PATCH | Sauvegarder `criteria` et/ou `planHtml` |
+| `/api/guides/[id]` | PATCH | Sauvegarder `criteria`, `planHtml`, `planJson` et/ou MetaFields |
 | `/api/guides/[id]` | DELETE | Supprimer un guide |
 | `/api/guides/[id]/products` | POST | Ajouter des ASINs au guide (crée placeholders + GuideProducts) |
 | `/api/guides/[id]/products` | DELETE | Supprimer un produit du guide (avec confirmation UI) |
@@ -101,7 +101,8 @@ Générateur de guides d'achat SEO avec fiches produits Amazon.
 | `src/lib/keywords/distributor.ts` | Distribution mots-clés entre produits |
 | `src/lib/guide/pipeline.ts` | (legacy) Pipeline complet monolithique |
 | `src/lib/guide/scrape-step.ts` | Scraping Apify + analyse IA (modèle `model_analysis`) + tri par prix croissant — status: scraping → analyzing → products-ready |
-| `src/lib/guide/plan-generator.ts` | Génération du plan IA (modèle `model_plan`) — status: generating-plan → plan-ready |
+| `src/lib/guide/plan-types.ts` | Types TypeScript pour le plan JSON structuré + helper `parsePlanJson()` |
+| `src/lib/guide/plan-generator.ts` | Génération du plan IA (modèle `model_plan`) — double sortie HTML + JSON — status: generating-plan → plan-ready |
 | `src/lib/guide/article-generator.ts` | Distribution mots-clés + génération fiches (template DB `prompt_generation`) + résumé + enrichissements + assemblage — status: distributing → generating → summarizing → enriching → complete |
 | `src/lib/guide/enrichment-step.ts` | Enrichissement article : résumé, chapô+intro, sommaire, FAQ, méta — 4 appels parallèles via `Promise.allSettled`. Extrait les sections du plan (`::: Nom :::`) pour les injecter via `{planSection}`. `loadPrompt()` charge depuis DB uniquement (erreur si manquant) |
 | `src/lib/guide/humanize-step.ts` | Humanisation article V1 → V2 via prompt `prompt_humaniser` (DB uniquement) — status: humanizing → complete |
@@ -131,7 +132,8 @@ Générateur de guides d'achat SEO avec fiches produits Amazon.
 | `serpanticsGuideId` | ID du guide Serpmantics (sauvegardé à la création, utilisé pour le score SEO) |
 | `seoScore` | Score SEO Serpmantics (Float?, persisté en DB après chaque calcul) |
 | `seoKeywords` | Mots-clés SEO avec occurrences (JSON string, persisté en DB) |
-| `planHtml` | Plan d'article généré par IA |
+| `planHtml` | Plan d'article généré par IA (HTML pour l'éditeur TipTap) |
+| `planJson` | Plan d'article en JSON structuré (pour l'extraction fiable des sections) |
 | `guideHtml` | Article complet assemblé par IA (chapô + sommaire + fiches + FAQ) |
 | `guideHtmlV2` | Article humanisé par IA (V2) |
 | `articleSummary` | Résumé de l'article (~200 mots, utilisé pour générer les éléments complémentaires) |
@@ -388,6 +390,17 @@ Note : le prompt plan n'est plus dans Paramètres (AppConfig `prompt_plan` suppr
 **`#ResumeProduits`** injecte pour chaque produit : nom, marque, prix, URL Amazon (`https://www.amazon.fr/dp/[ASIN]`), résumé de positionnement.
 
 La réponse IA est nettoyée des balises markdown (` ```html ` / ` ``` `) avant sauvegarde.
+
+### Plan JSON structuré
+
+Le plan-generator demande à l'IA de produire **deux sorties** : le HTML (pour l'éditeur TipTap) et un JSON structuré (entre `:::JSON_START:::` et `:::JSON_END:::`). Le JSON est stocké dans `guide.planJson` et sert à extraire les sections de manière fiable.
+
+**Extraction par ASIN** : au lieu de matcher les produits par titre (matching flou), le pipeline article utilise l'ASIN exact depuis le JSON. Fallback sur le parsing HTML si `planJson` est vide (rétrocompatibilité).
+
+**Fonctions d'extraction** :
+- `extractPlanSectionFromJson()` (article-generator) : extrait la section plan d'un produit par ASIN
+- `extractSectionFromJson()` (enrichment-step) : extrait chapô, introduction, critères, FAQ par clé JSON
+- `parsePlanJson()` (plan-types) : parse et valide le JSON
 
 ---
 
