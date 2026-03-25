@@ -4,7 +4,7 @@ import { cleanHtml, countWords } from "@/lib/generator/html-formatter";
 import { distributeKeywords } from "@/lib/keywords/distributor";
 import { getConfigModel } from "@/lib/config";
 import { calculateCost } from "@/lib/pricing";
-import { generateSummary, generateEnrichments, loadPrompt, loadForbiddenWords, formatForbiddenWords, stripBoldFromBody } from "./enrichment-step";
+import { generateSummary, generateEnrichments, loadPrompt, loadForbiddenWords, formatForbiddenWords, stripBoldFromBody, fixCapitalization } from "./enrichment-step";
 import { parsePlanJson } from "./plan-types";
 import type { Media, ProductIntelligence } from "@prisma/client";
 
@@ -320,8 +320,8 @@ export async function generateArticle(guideId: string): Promise<void> {
       enriched?.faqHtml,
     ].filter(Boolean).join("\n\n");
 
-    // Post-traitement : gras uniquement dans les headings et le chapô
-    const guideHtml = stripBoldFromBody(guideHtmlRaw);
+    // Post-traitements
+    const guideHtml = fixCapitalization(stripBoldFromBody(guideHtmlRaw));
 
     const guideWordCount = countWords(guideHtml);
 
