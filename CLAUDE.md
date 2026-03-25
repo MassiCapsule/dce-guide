@@ -616,3 +616,9 @@ Champs **retirés de l'UI média** (restent en DB) : `productStructureTemplate`,
 | 2026-03-25 | Image produit (`productImageUrl`) injectée automatiquement après le H2 de chaque fiche produit lors de l'assemblage |
 | 2026-03-25 | Température méta (slug, meta title, propositions H1) passée à 0.9 |
 | 2026-03-25 | Onglet "Post-traitement" en lecture seule dans Paramètres > Prompts — liste les 9 règles auto + tableau des températures IA |
+| 2026-03-25 | Post-traitements appliqués uniquement sur V2 — V1 reste brut (sans correction majuscules, sans gras chapô, sans liens affiliés) |
+| 2026-03-25 | Enchaînement automatique V1 → V2 : après génération V1, humanisation lancée auto + switch vers onglet Article V2 |
+| 2026-03-25 | Auto-switch tabs : plan → article, article V1 → article V2 (après 1.5s) |
+| 2026-03-25 | Tab Article V2 : détecte automatiquement une humanisation en cours (lancée par V1) et affiche la progression |
+| 2026-03-25 | Collapsible "Article V1 (original)" dans Tab Article V2 — fermé par défaut, affiche le HTML V1 en lecture seule |
+| 2026-03-25 | Champ `Brief` rendu optionnel sur `PlanProduct` — peut être retiré du `planOutputStructure` sans casser la chaîne |
