@@ -1,6 +1,6 @@
 "use client";
 
-import { Newspaper, Sparkles, BookOpen, Package, FileText, Settings, FlaskConical } from "lucide-react";
+import { Newspaper, Sparkles, BookOpen, Package, Settings, FlaskConical } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -18,7 +18,6 @@ import {
 const navItems = [
   { title: "Guides d'achat", href: "/guides", icon: BookOpen },
   { title: "Produits", href: "/intelligence", icon: Package },
-  { title: "Fiches produit", href: "/produits", icon: FileText },
   { title: "Medias", href: "/medias", icon: Newspaper },
   { title: "Playground", href: "/playground", icon: FlaskConical },
   { title: "Parametres", href: "/parametres", icon: Settings },
