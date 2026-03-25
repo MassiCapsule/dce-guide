@@ -60,6 +60,9 @@ function extractSectionFromJson(
 
   if (key === "chapo" && plan.chapo) {
     let text = "";
+    if (plan.chapo.brief) {
+      text += `Brief : ${plan.chapo.brief}\n`;
+    }
     if (plan.chapo.mots_cles?.length) {
       text += `Mots-clés : ${plan.chapo.mots_cles.join(", ")}\n`;
     }
@@ -71,6 +74,9 @@ function extractSectionFromJson(
 
   if (key === "introduction" && plan.introduction) {
     let text = "";
+    if (plan.introduction.brief) {
+      text += `Brief : ${plan.introduction.brief}\n`;
+    }
     if (plan.introduction.mots_cles?.length) {
       text += `Mots-clés : ${plan.introduction.mots_cles.join(", ")}\n`;
     }
@@ -97,18 +103,51 @@ function extractSectionFromJson(
     if (plan.criteres.structure) {
       text += `Structure : ${plan.criteres.structure}\n`;
     }
+    if (plan.criteres.items?.length) {
+      text += `\nCritères à rédiger (dans cet ordre exact) :\n`;
+      plan.criteres.items.forEach((item, i) => {
+        text += `${i + 1}. ${item.nom} : ${item.description}\n`;
+      });
+    }
     return text.trim();
   }
 
   if (key === "faq" && plan.faq) {
     let text = "";
+    if (plan.faq.brief) {
+      text += `Brief : ${plan.faq.brief}\n`;
+    }
     if (plan.faq.mots_cles?.length) {
       text += `Mots-clés : ${plan.faq.mots_cles.join(", ")}\n`;
+    }
+    if (plan.faq.nombre_mots) {
+      text += `Nombre de mots : ${plan.faq.nombre_mots}\n`;
+    }
+    if (plan.faq.items?.length) {
+      text += `\nQuestions à traiter (dans cet ordre exact) :\n`;
+      plan.faq.items.forEach((item, i) => {
+        text += `${i + 1}. ${item.nom}\n`;
+      });
     }
     return text.trim();
   }
 
   return "";
+}
+
+/**
+ * Extrait la liste des produits du plan JSON pour le sommaire.
+ * Retourne nom, prix et URL de chaque produit.
+ */
+function extractProductListFromJson(planJsonStr: string | null | undefined): string {
+  const plan = parsePlanJson(planJsonStr);
+  if (!plan?.produits?.length) return "";
+
+  let text = "Produits à présenter (dans cet ordre) :\n";
+  plan.produits.forEach((p, i) => {
+    text += `${i + 1}. ${p["Titre H2"]} — ${p.prix} — ${p.url}\n`;
+  });
+  return text.trim();
 }
 
 /**
@@ -246,7 +285,7 @@ export async function generateEnrichments(
     extractSectionFromJson(planJson, "Chapô"),
     extractSectionFromJson(planJson, "Introduction"),
   ].filter(Boolean).join("\n\n");
-  const sommairePlanSection = extractSectionFromJson(planJson, "Critères");
+  const sommairePlanSection = extractProductListFromJson(planJson);
   const criteresSelectionPlanSection = extractSectionFromJson(planJson, "Critères");
   const faqPlanSection = extractSectionFromJson(planJson, "FAQ");
 

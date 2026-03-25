@@ -4,12 +4,18 @@ export interface PlanH1 {
   titre: string;
 }
 
+export interface PlanSectionItem {
+  nom: string;
+  description: string;
+}
+
 export interface PlanSection {
   mots_cles?: string[];
   nombre_mots?: number;
   brief?: string;
   "Titre H2"?: string;
   structure?: string;
+  items?: PlanSectionItem[];
 }
 
 export interface PlanProductPart {

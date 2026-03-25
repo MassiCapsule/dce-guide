@@ -246,15 +246,20 @@ Style : {media.writingStyle}
 Mots interdits :
 {forbiddenWords}
 
-Génère une FAQ de 5 questions qui respectent ces règles :
+::: Mission :::
+Rédige la FAQ du guide d'achat en respectant les questions fournies dans le brief du plan.
 
-0. La FAQ doit être utile aux lecteurs de cet article
-1. Question posée comme si on était sur Google ou un LLM, balisée en H3
-2. Réponses de 35 mots dans un <p>, sans gras
-3. Classé les questions du global au particulier
-4. Pas de numéro ni emoji devant les questions
+::: Consignes :::
+- Rédige UNIQUEMENT les questions listées dans le brief du plan, dans le même ordre — aucun ajout, aucune suppression
+- Chaque question est reprise telle quelle du plan, sans reformulation
+- Réponses de 35 mots dans un <p>, sans gras
+- Classement du global au particulier (respecter l'ordre du plan)
+- Pas de numéro ni emoji devant les questions
+- Aucune adresse directe au lecteur ("vous", "votre")
+- Intègre naturellement les mots-clés SEO fournis
 
-Format de sortie : HTML uniquement. Commence par <h2>FAQ</h2>, puis chaque question en <h3> suivie de sa réponse en <p>. Pas de markdown, pas de listes.
+::: Format de sortie :::
+HTML uniquement. Commence par <h2>FAQ</h2>, puis chaque question en <h3> suivie de sa réponse en <p>. Pas de markdown, pas de listes.
 
 Exemple :
 <h2>FAQ</h2>
@@ -279,15 +284,16 @@ Mots interdits :
 Rédige la section "Critères de sélection" du guide d'achat. Cette section explique au lecteur les critères concrets utilisés pour comparer et sélectionner les produits présentés dans l'article.
 
 ::: Consignes :::
-- Reprends le titre H2 EXACTEMENT tel qu'il est dans le brief du plan — ne le modifie pas, ne le reformule pas, ne corrige pas les éventuelles fautes
-- Rédige UNIQUEMENT les critères listés dans le brief du plan — ne pas en ajouter, ne pas en supprimer, ne pas en reformuler
+- Utilise exclusivement le titre H2 fourni dans le brief du plan, sans le modifier
+- Rédige UNIQUEMENT les critères listés dans le brief du plan, dans le même ordre — aucun ajout, aucune suppression, aucune fusion
+- Chaque critère reprend le nom exact du plan, suivi d'une explication concrète en une ou deux phrases
 - Présente chaque critère comme un repère concret pour un lecteur sans expertise
 - Relie chaque critère à un bénéfice direct d'usage
 - Utilise la structure indiquée dans le brief (liste à puces ou paragraphes selon le plan)
-- Chaque critère : nom en gras suivi de deux-points puis d'une explication en minuscule (pas de majuscule après les deux-points)
 - Pas de jargon technique sans explication immédiate
 - Intègre naturellement les mots-clés SEO fournis
-- Respecte le nombre de mots indiqué dans le brief
+- Aucune adresse directe au lecteur ("vous", "votre")
+- Aucune méta-phrase qui parle du contenu ("nous retenons", "nous comparons", "cet article examine")
 
 ::: Format de sortie :::
 HTML uniquement. Le titre en <h2>, puis les critères selon la structure demandée (liste <ul><li> ou paragraphes <p>). Pas de markdown, pas d'images.
