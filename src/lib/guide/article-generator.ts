@@ -328,8 +328,8 @@ export async function generateArticle(guideId: string): Promise<void> {
       enriched?.faqHtml,
     ].filter(Boolean).join("\n\n");
 
-    // Post-traitements
-    const guideHtml = fixCapitalization(stripBoldFromBody(guideHtmlRaw), guide.title);
+    // Pas de post-traitements sur V1 (appliqués uniquement sur V2)
+    const guideHtml = guideHtmlRaw;
 
     const guideWordCount = countWords(guideHtml);
 

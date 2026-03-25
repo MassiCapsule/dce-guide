@@ -60,7 +60,8 @@ async function reassembleArticle(guideId: string): Promise<string> {
     guide.faqHtml,
   ].filter(Boolean).join("\n\n");
 
-  return fixCapitalization(stripBoldFromBody(guideHtmlRaw), guide.title);
+  // Pas de post-traitements sur V1
+  return guideHtmlRaw;
 }
 
 /**
