@@ -26,6 +26,10 @@ export function stripBoldFromBody(html: string): string {
     preserved.push(match);
     return `__PRESERVED_${preserved.length - 1}__`;
   });
+  result = result.replace(/<p><strong>VOIR SUR AMAZON<\/strong><\/p>/gi, (match) => {
+    preserved.push(match);
+    return `__PRESERVED_${preserved.length - 1}__`;
+  });
 
   // Supprimer le gras partout ailleurs
   result = result.replace(/<\/?strong>/gi, "");
