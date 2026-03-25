@@ -10,6 +10,34 @@ import { parsePlanJson } from "./plan-types";
 
 const bullet = (s: string) => (s.startsWith("- ") ? s : `- ${s}`);
 
+/**
+ * Supprime les balises <strong> de tout le HTML SAUF dans les headings (h1-h6)
+ * et le chapô (<p class="chapo">).
+ */
+export function stripBoldFromBody(html: string): string {
+  const preserved: string[] = [];
+
+  // Préserver les headings et le chapô
+  let result = html.replace(/<(h[1-6])[^>]*>[\s\S]*?<\/\1>/gi, (match) => {
+    preserved.push(match);
+    return `__PRESERVED_${preserved.length - 1}__`;
+  });
+  result = result.replace(/<p[^>]*class="chapo"[^>]*>[\s\S]*?<\/p>/gi, (match) => {
+    preserved.push(match);
+    return `__PRESERVED_${preserved.length - 1}__`;
+  });
+
+  // Supprimer le gras partout ailleurs
+  result = result.replace(/<\/?strong>/gi, "");
+
+  // Restaurer les sections préservées
+  for (let i = 0; i < preserved.length; i++) {
+    result = result.replace(`__PRESERVED_${i}__`, preserved[i]);
+  }
+
+  return result;
+}
+
 function cleanMarkdown(text: string): string {
   return text
     .replace(/^```html\s*/i, "")

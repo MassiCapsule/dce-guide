@@ -2,7 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { chatCompletion } from "@/lib/ai-client";
 import { getConfigModel } from "@/lib/config";
 import { calculateCost } from "@/lib/pricing";
-import { loadPrompt, loadForbiddenWords, formatForbiddenWords } from "./enrichment-step";
+import { loadPrompt, loadForbiddenWords, formatForbiddenWords, stripBoldFromBody } from "./enrichment-step";
 
 /**
  * Humanise l'article V1 d'un guide pour produire la version V2.
@@ -45,9 +45,10 @@ export async function humanizeArticle(guideId: string): Promise<void> {
       { role: "user", content: "Réécris l'article complet en suivant les instructions ci-dessus. Conserve la structure HTML et les balises." },
     ], { temperature: 0.7, maxTokens: 16384 });
 
-    // Nettoyage markdown
+    // Nettoyage markdown + post-traitement gras
     let htmlV2 = result.content;
     htmlV2 = htmlV2.replace(/^```html\s*/i, "").replace(/```\s*$/, "").trim();
+    htmlV2 = stripBoldFromBody(htmlV2);
 
     const cost = calculateCost(model, result.promptTokens, result.completionTokens);
 

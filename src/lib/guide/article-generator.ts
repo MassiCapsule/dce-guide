@@ -4,7 +4,7 @@ import { cleanHtml, countWords } from "@/lib/generator/html-formatter";
 import { distributeKeywords } from "@/lib/keywords/distributor";
 import { getConfigModel } from "@/lib/config";
 import { calculateCost } from "@/lib/pricing";
-import { generateSummary, generateEnrichments, loadPrompt, loadForbiddenWords, formatForbiddenWords } from "./enrichment-step";
+import { generateSummary, generateEnrichments, loadPrompt, loadForbiddenWords, formatForbiddenWords, stripBoldFromBody } from "./enrichment-step";
 import { parsePlanJson } from "./plan-types";
 import type { Media, ProductIntelligence } from "@prisma/client";
 
@@ -376,7 +376,7 @@ export async function generateArticle(guideId: string): Promise<void> {
       ? `<h1>${planData.H1.titre}</h1>`
       : (guide.planHtml.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i)?.[0] || `<h1>${guide.title}</h1>`);
 
-    const guideHtml = [
+    const guideHtmlRaw = [
       h1Title,
       enriched?.chapoHtml,
       enriched?.sommaireHtml,
@@ -384,6 +384,9 @@ export async function generateArticle(guideId: string): Promise<void> {
       bodyHtml,
       enriched?.faqHtml,
     ].filter(Boolean).join("\n\n");
+
+    // Post-traitement : gras uniquement dans les headings et le chapô
+    const guideHtml = stripBoldFromBody(guideHtmlRaw);
 
     const guideWordCount = countWords(guideHtml);
 
