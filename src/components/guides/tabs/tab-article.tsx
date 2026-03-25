@@ -31,6 +31,7 @@ interface TabArticleProps {
   };
   h1Alternatives?: string[];
   onRefresh: () => void;
+  onTabChange?: (tab: string) => void;
 }
 
 type GenerationPhase = "idle" | "distributing" | "generating" | "summarizing" | "enriching" | "complete";
@@ -53,6 +54,7 @@ export function TabArticle({
   meta: metaProp,
   h1Alternatives = [],
   onRefresh,
+  onTabChange,
 }: TabArticleProps) {
   const [html, setHtml] = useState<string>(initialHtml);
   const [meta, setMeta] = useState(metaProp);
@@ -188,7 +190,10 @@ export function TabArticle({
             imageCaption: guide.imageCaption || "",
           });
         }
-        setTimeout(() => setPhase("idle"), 1500);
+        setTimeout(() => {
+          setPhase("idle");
+          if (onTabChange) onTabChange("article-v2");
+        }, 1500);
         onRefresh();
       } else if (data.status === "error") {
         setGenerateError(data.errorMessage || "Erreur inconnue");

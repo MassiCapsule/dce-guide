@@ -170,7 +170,10 @@ export function TabPlan({ guideId, initialHtml, initialCriteria, keyword, seoSco
           // Calcul automatique du score SEO
           if (planHtml) handleRecalculate(planHtml);
         }
-        setTimeout(() => setProgress(0), 1500);
+        setTimeout(() => {
+          setProgress(0);
+          onTabChange("article");
+        }, 1500);
         onRefresh();
       } else if (data.status === "error") {
         clearInterval(progressInterval);

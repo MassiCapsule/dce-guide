@@ -274,6 +274,7 @@ export default function GuideDetailPage() {
               meta={{ slug: guide.slug || "", metaTitle: guide.metaTitle || "", metaDescription: guide.metaDescription || "", imageCaption: guide.imageCaption || "" }}
               h1Alternatives={(() => { try { return JSON.parse(guide.h1Alternatives || "[]"); } catch { return []; } })()}
               onRefresh={loadGuide}
+              onTabChange={setActiveTab}
             />
           </TabsContent>
 
