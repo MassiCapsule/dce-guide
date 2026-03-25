@@ -164,55 +164,11 @@ export async function generatePlan(guideId: string): Promise<void> {
       .replace(/#ResumeProduits/g, resumeProduits || "Aucun produit")
       .replace(/#MotsCles/g, motsCles || "Aucun mot-clé");
 
-    // Instructions de format ajoutées après le prompt média (commun à tous les médias)
-    const formatInstructions = `
-
-// FORMAT DE SORTIE — DOUBLE OBLIGATOIRE
-
-PARTIE 1 : Plan HTML
-Répondre en HTML propre avec uniquement ces balises : <h1>, <h2>, <h3>, <h4>, <p>, <ul>, <li>
-Aucune autre balise autorisée. Pas de markdown. Pas de gras. Pas d'italique.
-
-PARTIE 2 : JSON structuré
-Après le plan HTML, produire un bloc JSON entre :::JSON_START::: et :::JSON_END:::
-
-Structure JSON exacte à respecter :
-{
-  "H1": { "titre": "Le titre H1 du plan" },
-  "chapo": { "mots_cles": ["mot1", "mot2"], "nombre_mots": 30 },
-  "introduction": { "mots_cles": ["mot1", "mot2"], "nombre_mots": 100 },
-  "criteres": { "Titre H2": "Titre H2 des critères", "brief": "Brief de la section critères", "mots_cles": ["mot1"], "nombre_mots": 200, "structure": "liste a puces" },
-  "produits": [
-    {
-      "asin": "ASIN_DU_PRODUIT",
-      "Titre H2": "Titre H2 éditorial du produit",
-      "Brief": "Brief éditorial global de la fiche produit",
-      "parties": {
-        "situation": { "brief": "Brief de la scène de vie" },
-        "atouts": { "h2": "Titre H2 de la partie Atout", "brief": "Brief de la partie Atout", "points": ["élément1", "élément2"] },
-        "valeur": { "h2": "Titre H2 de la partie Valeur", "brief": "Brief de la partie Valeur" },
-        "evidence": { "h2": "Titre H2 de la partie Évidence", "brief": "Brief de la partie Évidence" }
-      },
-      "mots_cles": ["mot1", "mot2"],
-      "mots_total": 350,
-      "prix": "prix en clair",
-      "url": "https://www.amazon.fr/dp/ASIN_DU_PRODUIT"
-    }
-  ],
-  "faq": { "mots_cles": ["mot1", "mot2"] }
-}
-
-Règles JSON :
-- L'ASIN de chaque produit doit correspondre EXACTEMENT aux ASINs fournis dans les données produits
-- L'URL doit être au format https://www.amazon.fr/dp/{ASIN}
-- Les produits doivent être dans le même ordre que dans le plan HTML
-- Le JSON reflète fidèlement le contenu du plan HTML
-- Les briefs dans "parties" décrivent ce que chaque section doit contenir
-- "atouts.points" liste les éléments concrets et visibles du produit
-- "situation" n'a PAS de h2 (pas de titre visible)
-`;
-
-    const finalPrompt = prompt + formatInstructions;
+    // Structure de sortie : depuis le média, sinon vide (pas de format imposé)
+    const outputStructure = guide.media?.planOutputStructure?.trim() || "";
+    const finalPrompt = outputStructure
+      ? prompt + "\n\n" + outputStructure
+      : prompt;
 
     const completion = await chatCompletion(model, [
       { role: "system", content: finalPrompt },

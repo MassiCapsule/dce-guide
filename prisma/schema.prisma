@@ -23,6 +23,7 @@ model Media {
   productStructureTemplate String
   defaultProductWordCount  Int      @default(800)
   promptPlan               String   @default("")
+  planOutputStructure      String   @default("") // Structure de sortie du plan (format HTML + JSON)
   modelPlan                String   @default("") // modèle IA pour la génération du plan (vide = config globale)
   forbiddenWords           String   @default("") // mots/expressions interdits, JSON string array
   createdAt                DateTime @default(now())

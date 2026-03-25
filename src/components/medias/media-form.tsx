@@ -47,6 +47,7 @@ interface MediaFormProps {
     productStructureTemplate: string;
     defaultProductWordCount: number;
     promptPlan: string;
+    planOutputStructure: string;
     modelPlan: string;
     forbiddenWords: string;
   };
@@ -86,6 +87,7 @@ export function MediaForm({ media }: MediaFormProps) {
     media?.defaultProductWordCount ?? 800
   );
   const [promptPlan, setPromptPlan] = useState(media?.promptPlan ?? "");
+  const [planOutputStructure, setPlanOutputStructure] = useState(media?.planOutputStructure ?? "");
   const [modelPlan, setModelPlan] = useState(media?.modelPlan || "__global__");
   const [forbiddenWords, setForbiddenWords] = useState(() => {
     if (!media?.forbiddenWords) return "";
@@ -127,6 +129,7 @@ export function MediaForm({ media }: MediaFormProps) {
         productStructureTemplate,
         defaultProductWordCount,
         promptPlan,
+        planOutputStructure,
         modelPlan: modelPlan === "__global__" ? "" : modelPlan,
       };
 
@@ -330,6 +333,21 @@ export function MediaForm({ media }: MediaFormProps) {
             />
             <p className="text-xs text-muted-foreground">
               Si vide, le prompt par defaut sera utilise.
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="planOutputStructure">Structure de sortie du plan</Label>
+            <Textarea
+              id="planOutputStructure"
+              value={planOutputStructure}
+              onChange={(e) => setPlanOutputStructure(e.target.value)}
+              placeholder="Instructions de format de sortie (HTML + JSON). Ajouté automatiquement après le prompt plan."
+              rows={12}
+              className="font-mono text-sm"
+            />
+            <p className="text-xs text-muted-foreground">
+              Format de sortie (HTML + JSON) concaténé après le prompt plan. Commun ou personnalisable par média.
             </p>
           </div>
 
