@@ -34,117 +34,54 @@ export function htmlToReadableText(html: string): string {
 }
 
 /**
- * Vérifie si un titre produit (Amazon, souvent anglais) correspond à un titre de section du plan (français).
- * Compare la marque et les mots significatifs.
- */
-function titlesMatch(planTitle: string, productTitle: string): boolean {
-  const normalize = (s: string) => s.toLowerCase().replace(/[^\w\sàâäéèêëïîôùûüç&]/g, " ").replace(/\s+/g, " ").trim();
-  const planNorm = normalize(planTitle);
-  const productNorm = normalize(productTitle);
-
-  // Match direct (20 premiers caractères)
-  if (planNorm.includes(productNorm.substring(0, 20))) return true;
-  if (productNorm.includes(planNorm.substring(0, 20))) return true;
-
-  // Extraire les mots significatifs (> 2 chars) de chaque titre
-  const planWords = planNorm.split(" ").filter((w) => w.length > 2);
-  const productWords = productNorm.split(" ").filter((w) => w.length > 2);
-
-  // Compter les mots en commun
-  const commonWords = planWords.filter((w) => productWords.some((pw) => pw === w || pw.includes(w) || w.includes(pw)));
-
-  // Au moins 1 mot significatif en commun pour les noms de marque (> 5 chars)
-  const longCommon = planWords.filter((w) => w.length > 5 && productWords.some((pw) => pw === w || pw.includes(w) || w.includes(pw)));
-  if (longCommon.length >= 1) return true;
-
-  // Sinon au moins 2 mots en commun
-  return commonWords.length >= 2;
-}
-
-export function extractPlanSection(planHtml: string, productTitle: string): string {
-  if (!planHtml || !productTitle) return "";
-
-  // Chercher dans H3 (format principal) puis H2 (fallback)
-  for (const tagLevel of ["h3", "h2"] as const) {
-    const regex = new RegExp(`(<${tagLevel}[\\s\\S]*?<\\/${tagLevel}>)`, "gi");
-    const parts = planHtml.split(regex).filter(Boolean);
-
-    for (let i = 0; i < parts.length; i++) {
-      const part = parts[i];
-      if (new RegExp(`<${tagLevel}`, "i").test(part)) {
-        const headingText = part.replace(/<[^>]+>/g, "");
-        if (titlesMatch(headingText, productTitle)) {
-          // Capturer le heading + TOUT le contenu jusqu'au prochain heading de même niveau
-          let content = part;
-          for (let j = i + 1; j < parts.length; j++) {
-            if (new RegExp(`<${tagLevel}`, "i").test(parts[j])) break;
-            content += parts[j];
-          }
-          // Convertir les H4 en H2 (titres à reproduire)
-          content = content.replace(/<h4([^>]*)>/gi, "<h2$1>").replace(/<\/h4>/gi, "</h2>");
-          return htmlToReadableText(content);
-        }
-      }
-    }
-  }
-
-  return "";
-}
-
-/**
  * Extrait la section du plan pour un produit via son ASIN (match exact depuis planJson).
- * Fallback sur l'ancien parsing HTML si planJson est vide.
  */
 export function extractPlanSectionFromJson(
   planJsonStr: string | null | undefined,
-  planHtml: string,
-  asin: string,
-  productTitle: string
+  asin: string
 ): string {
   const plan = parsePlanJson(planJsonStr);
+  if (!plan) return "";
 
-  if (plan) {
-    const product = plan.produits.find((p) => p.asin === asin);
-    if (product) {
-      let text = `## ${product["Titre H2"]}\n`;
-      text += `Brief : ${product.Brief}\n\n`;
-
-      text += `PARTIE 1 – Situation (sans titre visible)\n`;
-      text += `Brief : ${product.parties.situation.brief}\n\n`;
-
-      if (product.parties.atouts.h2) {
-        text += `## ${product.parties.atouts.h2}\n`;
-      }
-      text += `Brief : ${product.parties.atouts.brief}\n`;
-      if (product.parties.atouts.points?.length) {
-        text += `Points : ${product.parties.atouts.points.join(", ")}\n`;
-      }
-      text += "\n";
-
-      if (product.parties.valeur.h2) {
-        text += `## ${product.parties.valeur.h2}\n`;
-      }
-      text += `Brief : ${product.parties.valeur.brief}\n\n`;
-
-      if (product.parties.evidence.h2) {
-        text += `## ${product.parties.evidence.h2}\n`;
-      }
-      text += `Brief : ${product.parties.evidence.brief}\n\n`;
-
-      if (product.mots_cles?.length) {
-        text += `Mots-clés secondaires : ${product.mots_cles.join(", ")}\n`;
-      }
-      text += `Nombre de mots : ${product.mots_total}\n`;
-      text += `Prix : ${product.prix}\n`;
-      text += `URL marchand : ${product.url}\n`;
-
-      return text.trim();
-    }
-    console.warn(`Produit ASIN ${asin} non trouvé dans planJson, fallback HTML`);
+  const product = plan.produits.find((p) => p.asin === asin);
+  if (!product) {
+    console.warn(`Produit ASIN ${asin} non trouvé dans planJson`);
+    return "";
   }
 
-  // Fallback: ancien parsing HTML
-  return extractPlanSection(planHtml, productTitle);
+  let text = `## ${product["Titre H2"]}\n`;
+  text += `Brief : ${product.Brief}\n\n`;
+
+  text += `PARTIE 1 – Situation (sans titre visible)\n`;
+  text += `Brief : ${product.parties.situation.brief}\n\n`;
+
+  if (product.parties.atouts.h2) {
+    text += `## ${product.parties.atouts.h2}\n`;
+  }
+  text += `Brief : ${product.parties.atouts.brief}\n`;
+  if (product.parties.atouts.points?.length) {
+    text += `Points : ${product.parties.atouts.points.join(", ")}\n`;
+  }
+  text += "\n";
+
+  if (product.parties.valeur.h2) {
+    text += `## ${product.parties.valeur.h2}\n`;
+  }
+  text += `Brief : ${product.parties.valeur.brief}\n\n`;
+
+  if (product.parties.evidence.h2) {
+    text += `## ${product.parties.evidence.h2}\n`;
+  }
+  text += `Brief : ${product.parties.evidence.brief}\n\n`;
+
+  if (product.mots_cles?.length) {
+    text += `Mots-clés secondaires : ${product.mots_cles.join(", ")}\n`;
+  }
+  text += `Nombre de mots : ${product.mots_total}\n`;
+  text += `Prix : ${product.prix}\n`;
+  text += `URL marchand : ${product.url}\n`;
+
+  return text.trim();
 }
 
 /**
@@ -275,9 +212,7 @@ export async function generateArticle(guideId: string): Promise<void> {
 
       const planSection = extractPlanSectionFromJson(
         guide.planJson,
-        guide.planHtml,
-        rp.intelligence.asin,
-        rp.intelligence.productTitle
+        rp.intelligence.asin
       );
 
       // Nombre de mots : depuis le plan JSON (mots_total), fallback 800
@@ -360,7 +295,7 @@ export async function generateArticle(guideId: string): Promise<void> {
     });
 
     const { totalCost: enrichCost } = await generateEnrichments(
-      guideId, summary, guide.media, guide.title, model, guide.planHtml, guide.planJson
+      guideId, summary, guide.media, guide.title, model, guide.planJson
     );
     totalCost += enrichCost;
 

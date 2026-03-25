@@ -39,12 +39,10 @@ export async function POST(req: NextRequest) {
     ]);
     const forbiddenFormatted = formatForbiddenWords(forbiddenWords);
 
-    // Extraire la section du plan pour ce produit (JSON prioritaire, fallback HTML)
+    // Extraire la section du plan pour ce produit
     const planSection = extractPlanSectionFromJson(
       guide.planJson,
-      guide.planHtml,
-      intelligence.asin,
-      intelligence.productTitle
+      intelligence.asin
     );
 
     // Nombre de mots : depuis le plan JSON (mots_total), fallback 800

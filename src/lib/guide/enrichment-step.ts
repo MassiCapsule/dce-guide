@@ -46,178 +46,69 @@ function cleanMarkdown(text: string): string {
 }
 
 /**
- * Convertit du HTML en texte lisible, en préservant la structure.
- */
-function htmlToReadableText(html: string): string {
-  return html
-    .replace(/<h1[^>]*>([\s\S]*?)<\/h1>/gi, "\n# $1\n")
-    .replace(/<h2[^>]*>([\s\S]*?)<\/h2>/gi, "\n## $1\n")
-    .replace(/<h3[^>]*>([\s\S]*?)<\/h3>/gi, "\n### $1\n")
-    .replace(/<li[^>]*>([\s\S]*?)<\/li>/gi, "- $1\n")
-    .replace(/<br\s*\/?>/gi, "\n")
-    .replace(/<\/p>/gi, "\n")
-    .replace(/<[^>]+>/g, "")
-    .replace(/&nbsp;/g, " ")
-    .replace(/&amp;/g, "&")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/\n{3,}/g, "\n\n")
-    .trim();
-}
-
-/**
- * Extrait une section du plan par son nom (ex: "Chapô", "Introduction", "FAQ").
- * Cherche le H2 correspondant et retourne tout le contenu jusqu'au H2 suivant.
- * Supporte aussi le format ::: NomSection ::: en fallback.
- */
-function extractPlanSectionByName(planHtml: string, sectionName: string): string {
-  if (!planHtml || !sectionName) return "";
-
-  const normalize = (s: string) => s.toLowerCase().replace(/[^\w\sàâäéèêëïîôùûüç]/g, " ").replace(/\s+/g, " ").trim();
-  const normalizedName = normalize(sectionName);
-
-  // Méthode 1 : chercher par H2
-  const h2Regex = /(<h2[\s\S]*?<\/h2>)/gi;
-  const parts = planHtml.split(h2Regex).filter(Boolean);
-
-  for (let i = 0; i < parts.length; i++) {
-    const part = parts[i];
-    if (/<h2/i.test(part)) {
-      const h2Text = normalize(part.replace(/<[^>]+>/g, ""));
-      if (h2Text.includes(normalizedName) || normalizedName.includes(h2Text)) {
-        // Capturer le contenu après ce H2 jusqu'au prochain H2
-        let content = "";
-        for (let j = i + 1; j < parts.length; j++) {
-          if (/<h2/i.test(parts[j])) break;
-          content += parts[j];
-        }
-        return htmlToReadableText(content);
-      }
-    }
-  }
-
-  // Méthode 2 (fallback) : chercher par ::: NomSection :::
-  const text = htmlToReadableText(planHtml);
-  const regex = new RegExp(
-    `:::\\s*${sectionName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*:::([\\s\\S]*?)(?=:::|$)`,
-    "i"
-  );
-  const match = text.match(regex);
-  if (match) return match[1].trim();
-
-  return "";
-}
-
-/**
- * Extrait la section critères du plan (le H2 entre Introduction et Fiches produits).
- * Le titre de cette section varie selon le plan, on ne peut pas chercher par nom.
- */
-function extractCriteriaPlanSection(planHtml: string): string {
-  if (!planHtml) return "";
-
-  const normalize = (s: string) => s.toLowerCase().replace(/[^\w\sàâäéèêëïîôùûüç]/g, " ").replace(/\s+/g, " ").trim();
-
-  const h2Regex = /(<h2[\s\S]*?<\/h2>)/gi;
-  const parts = planHtml.split(h2Regex).filter(Boolean);
-
-  let foundIntro = false;
-  for (let i = 0; i < parts.length; i++) {
-    const part = parts[i];
-    if (/<h2/i.test(part)) {
-      const h2Text = normalize(part.replace(/<[^>]+>/g, ""));
-      if (h2Text.includes("introduction")) {
-        foundIntro = true;
-        continue;
-      }
-      if (foundIntro && !h2Text.includes("fiche") && !h2Text.includes("produit")) {
-        // C'est le H2 des critères — capturer son contenu
-        let content = "";
-        for (let j = i + 1; j < parts.length; j++) {
-          if (/<h2/i.test(parts[j])) break;
-          content += parts[j];
-        }
-        return htmlToReadableText(part + content);
-      }
-      if (foundIntro && (h2Text.includes("fiche") || h2Text.includes("produit"))) {
-        break; // Pas de section critères trouvée
-      }
-    }
-  }
-
-  return "";
-}
-
-/**
  * Extrait une section du plan depuis le JSON structuré.
- * Fallback sur l'ancien parsing HTML si planJson est vide.
  */
 function extractSectionFromJson(
   planJsonStr: string | null | undefined,
-  planHtml: string,
   sectionName: string
 ): string {
   const plan = parsePlanJson(planJsonStr);
+  if (!plan) return "";
 
-  if (plan) {
-    const key = sectionName.toLowerCase()
-      .normalize("NFD").replace(/[\u0300-\u036f]/g, ""); // Remove accents
+  const key = sectionName.toLowerCase()
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, ""); // Remove accents
 
-    if (key === "chapo" && plan.chapo) {
-      let text = "";
-      if (plan.chapo.mots_cles?.length) {
-        text += `Mots-clés : ${plan.chapo.mots_cles.join(", ")}\n`;
-      }
-      if (plan.chapo.nombre_mots) {
-        text += `Nombre de mots : ${plan.chapo.nombre_mots}\n`;
-      }
-      return text.trim();
+  if (key === "chapo" && plan.chapo) {
+    let text = "";
+    if (plan.chapo.mots_cles?.length) {
+      text += `Mots-clés : ${plan.chapo.mots_cles.join(", ")}\n`;
     }
-
-    if (key === "introduction" && plan.introduction) {
-      let text = "";
-      if (plan.introduction.mots_cles?.length) {
-        text += `Mots-clés : ${plan.introduction.mots_cles.join(", ")}\n`;
-      }
-      if (plan.introduction.nombre_mots) {
-        text += `Nombre de mots : ${plan.introduction.nombre_mots}\n`;
-      }
-      return text.trim();
+    if (plan.chapo.nombre_mots) {
+      text += `Nombre de mots : ${plan.chapo.nombre_mots}\n`;
     }
-
-    if (key === "criteres" && plan.criteres) {
-      let text = "";
-      if (plan.criteres["Titre H2"]) {
-        text += `## ${plan.criteres["Titre H2"]}\n`;
-      }
-      if (plan.criteres.brief) {
-        text += `Brief : ${plan.criteres.brief}\n`;
-      }
-      if (plan.criteres.mots_cles?.length) {
-        text += `Mots-clés : ${plan.criteres.mots_cles.join(", ")}\n`;
-      }
-      if (plan.criteres.nombre_mots) {
-        text += `Nombre de mots : ${plan.criteres.nombre_mots}\n`;
-      }
-      if (plan.criteres.structure) {
-        text += `Structure : ${plan.criteres.structure}\n`;
-      }
-      return text.trim();
-    }
-
-    if (key === "faq" && plan.faq) {
-      let text = "";
-      if (plan.faq.mots_cles?.length) {
-        text += `Mots-clés : ${plan.faq.mots_cles.join(", ")}\n`;
-      }
-      return text.trim();
-    }
+    return text.trim();
   }
 
-  // Fallback HTML
-  if (sectionName.toLowerCase().includes("critère") || sectionName.toLowerCase().includes("critere")) {
-    return extractCriteriaPlanSection(planHtml);
+  if (key === "introduction" && plan.introduction) {
+    let text = "";
+    if (plan.introduction.mots_cles?.length) {
+      text += `Mots-clés : ${plan.introduction.mots_cles.join(", ")}\n`;
+    }
+    if (plan.introduction.nombre_mots) {
+      text += `Nombre de mots : ${plan.introduction.nombre_mots}\n`;
+    }
+    return text.trim();
   }
-  return extractPlanSectionByName(planHtml, sectionName);
+
+  if (key === "criteres" && plan.criteres) {
+    let text = "";
+    if (plan.criteres["Titre H2"]) {
+      text += `## ${plan.criteres["Titre H2"]}\n`;
+    }
+    if (plan.criteres.brief) {
+      text += `Brief : ${plan.criteres.brief}\n`;
+    }
+    if (plan.criteres.mots_cles?.length) {
+      text += `Mots-clés : ${plan.criteres.mots_cles.join(", ")}\n`;
+    }
+    if (plan.criteres.nombre_mots) {
+      text += `Nombre de mots : ${plan.criteres.nombre_mots}\n`;
+    }
+    if (plan.criteres.structure) {
+      text += `Structure : ${plan.criteres.structure}\n`;
+    }
+    return text.trim();
+  }
+
+  if (key === "faq" && plan.faq) {
+    let text = "";
+    if (plan.faq.mots_cles?.length) {
+      text += `Mots-clés : ${plan.faq.mots_cles.join(", ")}\n`;
+    }
+    return text.trim();
+  }
+
+  return "";
 }
 
 /**
@@ -348,17 +239,16 @@ export async function generateEnrichments(
   media: EnrichmentMedia,
   keyword: string,
   model: string,
-  planHtml: string = "",
   planJson: string = ""
 ): Promise<{ totalCost: number }> {
   // Extraire les sections du plan pour chaque élément (JSON prioritaire, fallback HTML)
   const chapoPlanSection = [
-    extractSectionFromJson(planJson, planHtml, "Chapô"),
-    extractSectionFromJson(planJson, planHtml, "Introduction"),
+    extractSectionFromJson(planJson, "Chapô"),
+    extractSectionFromJson(planJson, "Introduction"),
   ].filter(Boolean).join("\n\n");
-  const sommairePlanSection = extractSectionFromJson(planJson, planHtml, "Critères");
-  const criteresSelectionPlanSection = extractSectionFromJson(planJson, planHtml, "Critères");
-  const faqPlanSection = extractSectionFromJson(planJson, planHtml, "FAQ");
+  const sommairePlanSection = extractSectionFromJson(planJson, "Critères");
+  const criteresSelectionPlanSection = extractSectionFromJson(planJson, "Critères");
+  const faqPlanSection = extractSectionFromJson(planJson, "FAQ");
 
   // Load all 5 prompts + forbidden words in parallel
   const [chapoTemplate, sommaireTemplate, criteresSelectionTemplate, faqTemplate, metaTemplate, forbiddenWords] =
