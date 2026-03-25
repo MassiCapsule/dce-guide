@@ -83,3 +83,15 @@ L'outil s'adapte entièrement à votre ligne éditoriale. 9 prompts personnalisa
 9. **Humaniser** — La réécriture finale qui efface les tics d'écriture IA
 
 Chaque prompt utilise des variables (entre accolades) qui sont remplacées automatiquement par les données réelles : nom du média, mot-clé, résumé, brief du plan, données produit, etc.
+
+---
+
+## Post-traitements automatiques
+
+Après chaque génération (article V1, V2, relance intro+FAQ), trois corrections sont appliquées automatiquement sur le HTML :
+
+1. **Suppression du gras dans le corps de texte** — Les balises `<strong>` sont retirées partout sauf dans les titres (h1 à h6) et le chapô (`<p class="chapo">`). L'IA a tendance à abuser du gras, ce traitement garantit un rendu éditorial propre.
+
+2. **Majuscule en début de phrase** — Après un point `.`, un point d'exclamation `!` ou un point d'interrogation `?`, la lettre suivante est forcée en majuscule.
+
+3. **Minuscule après les deux-points** — Après le signe `:`, la lettre suivante est forcée en minuscule. Si un nom propre se retrouve en minuscule par erreur, il faut le corriger manuellement dans l'éditeur.

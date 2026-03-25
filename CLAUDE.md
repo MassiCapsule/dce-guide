@@ -52,13 +52,13 @@ Générateur de guides d'achat SEO avec fiches produits Amazon.
 | `src/app/playground/page.tsx` | Playground : sélecteur guide → produit → prompt résolu complet → génération → humanisation V2 |
 | `src/components/editor/rich-editor.tsx` | Éditeur WYSIWYG TipTap v3 (H1/H2/H3, gras, listes, tableau, bouton copier formaté) |
 | `src/components/editor/seo-score-bar.tsx` | Barre score SEO Serpmantics + pills mots-clés |
-| `src/components/editor/meta-fields.tsx` | Champs méta : slug, meta title, meta desc, légende image |
+| `src/components/editor/meta-fields.tsx` | Champs méta : slug, meta title, meta desc, légende image (sans H1 — H1 est dans un collapsible séparé) |
 | `src/components/guides/tabs/tab-overview.tsx` | Onglet Vue d'ensemble : infos guide, mots-clés collapsible, bouton "Ajouter des produits", progression |
 | `src/components/guides/tabs/tab-products.tsx` | Onglet Produits : ajout ASIN, bouton sticky "Lancer la récupération" + barre de progression (scraping/analyse), suppression avec confirmation |
 | `src/components/intelligence/intelligence-list.tsx` | Liste produits intelligence avec suppression + confirmation |
 | `src/components/guides/tabs/tab-plan.tsx` | Onglet Plan : critères éditables + bouton Perplexity + bouton sticky "Générer le plan (IA)" + barre de progression + polling + RichEditor |
-| `src/components/guides/tabs/tab-article.tsx` | Onglet Article : bouton sticky "Générer l'article (IA)" pleine largeur + barre de progression + polling + RichEditor |
-| `src/components/guides/tabs/tab-article-v2.tsx` | Onglet Article V2 : bouton sticky "Générer l'article V2 (Humaniser)" + barre de progression + polling + RichEditor |
+| `src/components/guides/tabs/tab-article.tsx` | Onglet Article : bouton sticky "Générer l'article (IA)" + bouton "Intro + FAQ" + collapsible "Titre H1" (propositions IA) + collapsible "Éléments SEO" + RichEditor |
+| `src/components/guides/tabs/tab-article-v2.tsx` | Onglet Article V2 : bouton sticky "Humaniser" + bouton "Intro + FAQ" (cible V2) + collapsible "Titre H1" + collapsible "Éléments SEO" + RichEditor |
 | `src/app/guides/[id]/page.tsx` | Page guide : charge vraies données API, passe guideId + onRefresh à chaque tab, suppression guide avec confirmation |
 
 ### API Routes
@@ -66,7 +66,7 @@ Générateur de guides d'achat SEO avec fiches produits Amazon.
 |-------|---------|------|
 | `/api/guides` | POST | Créer un guide (keyword, media, criteria, keywords, wordCount, serpanticsGuideId) |
 | `/api/guides/[id]` | GET | Charger un guide complet (products.intelligence + keywords) |
-| `/api/guides/[id]` | PATCH | Sauvegarder `criteria`, `planHtml`, `planJson` et/ou MetaFields |
+| `/api/guides/[id]` | PATCH | Sauvegarder `criteria`, `planHtml`, `planJson`, MetaFields, `guideHtml`, `guideHtmlV2` |
 | `/api/guides/[id]` | DELETE | Supprimer un guide |
 | `/api/guides/[id]/products` | POST | Ajouter des ASINs au guide (crée placeholders + GuideProducts) |
 | `/api/guides/[id]/products` | DELETE | Supprimer un produit du guide (avec confirmation UI) |
@@ -76,6 +76,7 @@ Générateur de guides d'achat SEO avec fiches produits Amazon.
 | `/api/guides/[id]/plan` | POST | Lancer génération du plan en arrière-plan |
 | `/api/guides/[id]/article` | POST | Lancer génération de l'article V1 en arrière-plan |
 | `/api/guides/[id]/humanize` | POST | Lancer humanisation de l'article (V1 → V2) en arrière-plan |
+| `/api/guides/[id]/regenerate-intro-faq` | POST | Relancer chapô+intro et FAQ — body `{ target: "v1" }` ou `{ target: "v2" }`. V1 ré-assemble l'article complet, V2 remplace les sections dans guideHtmlV2 |
 | `/api/guides/[id]/score` | POST | Calculer le score SEO Serpmantics sur un contenu HTML |
 | `/api/guides/[id]/status` | GET | Statut du pipeline (status, currentStep, errorMessage) |
 | `/api/guides/[id]/generate` | POST | (legacy) Pipeline complet monolithique |
@@ -104,7 +105,7 @@ Générateur de guides d'achat SEO avec fiches produits Amazon.
 | `src/lib/guide/plan-types.ts` | Types TypeScript pour le plan JSON structuré (`PlanSection`, `PlanSectionItem`, `PlanProduct`) + helper `parsePlanJson()` |
 | `src/lib/guide/plan-generator.ts` | Génération du plan IA (modèle `model_generation`) — double sortie HTML + JSON — status: generating-plan → plan-ready |
 | `src/lib/guide/article-generator.ts` | Génération fiches (template DB `prompt_generation`, nb mots depuis `planJson.mots_total`) + résumé + enrichissements + assemblage + post-traitement bold — status: generating → summarizing → enriching → complete |
-| `src/lib/guide/enrichment-step.ts` | Enrichissement article : résumé, chapô+intro, sommaire, critères sélection, FAQ, méta — 5 appels parallèles. Helpers `loadForbiddenWords()` + `formatForbiddenWords()` + `stripBoldFromBody()`. Extraction sections depuis JSON : `extractSectionFromJson()` (chapô brief, intro brief, critères items, FAQ questions) + `extractProductListFromJson()` (liste produits pour sommaire) |
+| `src/lib/guide/enrichment-step.ts` | Enrichissement article : résumé, chapô+intro (temp 0.9), sommaire, critères sélection, FAQ, méta+H1 alternatives — 5 appels parallèles. Helpers `loadForbiddenWords()` + `formatForbiddenWords()` + `stripBoldFromBody()` + `fixCapitalization()`. `regenerateChapoAndFaq()` pour relancer intro+FAQ seuls. `parseMetaResponse()` extrait aussi `h1Alternatives`. Placeholder `{h1}` injecté dans le prompt méta. Extraction sections depuis JSON : `extractSectionFromJson()` (chapô brief, intro brief, critères items, FAQ mots-clés uniquement) + `extractProductListFromJson()` (liste produits pour sommaire) |
 | `src/lib/guide/humanize-step.ts` | Humanisation article V1 → V2 via prompt `prompt_humaniser` (modèle `model_humanization`) + post-traitement bold — status: humanizing → complete |
 | `src/lib/prompt-builder/index.ts` | (legacy) Ancien prompt builder hardcodé — **plus utilisé par le pipeline**, remplacé par le template DB `prompt_generation` |
 | `src/lib/prompt-builder/annotated.ts` | Construit un prompt annoté depuis un template (placeholders → segments avec badges) pour le Playground |
@@ -145,6 +146,7 @@ Générateur de guides d'achat SEO avec fiches produits Amazon.
 | `metaDescription` | Meta description générée par IA (éditable dans Éléments SEO) |
 | `imageCaption` | Légende photo générée par IA (éditable dans Éléments SEO) |
 | `slug` | Slug URL généré par IA (éditable dans Éléments SEO) |
+| `h1Alternatives` | 10 propositions de H1 générées par l'IA (JSON string array, éditable dans collapsible "Titre H1") |
 
 ### Champs Media importants
 | Champ | Rôle |
@@ -165,8 +167,8 @@ Générateur de guides d'achat SEO avec fiches produits Amazon.
 | `prompt_chapo` | Prompt chapô (30 mots) + introduction (100 mots) — placeholders : `{media.name}`, `{media.toneDescription}`, `{media.writingStyle}`, `{forbiddenWords}`, `{keyword}`, `{resume}`, `{planSection}` (= brief + mots-clés du chapô et de l'introduction depuis le plan JSON) |
 | `prompt_sommaire` | Prompt sommaire / sélection produits — mêmes placeholders + `{planSection}` (= liste des produits avec nom, prix, URL depuis le plan JSON) |
 | `prompt_criteres_selection` | Prompt critères de sélection — mêmes placeholders + `{planSection}` (= brief + items numérotés des critères depuis le plan JSON) |
-| `prompt_faq` | Prompt FAQ — mêmes placeholders + `{planSection}` (= brief + questions numérotées depuis le plan JSON) |
-| `prompt_meta` | Prompt meta title + meta description + légende + slug — mêmes placeholders (sans `{planSection}`) |
+| `prompt_faq` | Prompt FAQ — mêmes placeholders + `{planSection}` (= brief + mots-clés uniquement depuis le plan JSON, plus de questions imposées) |
+| `prompt_meta` | Prompt meta title + meta description + légende + slug + 10 propositions H1 — mêmes placeholders (sans `{planSection}`) + `{h1}` (H1 actuel injecté depuis planJson) |
 | `forbidden_words` | Interdits lexicaux (JSON string array) — mots/expressions à ne jamais utiliser. Placeholder `{forbiddenWords}` dans les prompts |
 | `openai_api_key` | Clé API OpenAI (saisie depuis /parametres > Clés API) |
 | `anthropic_api_key` | Clé API Anthropic (saisie depuis /parametres > Clés API) |
@@ -356,7 +358,9 @@ Architecture à 5 onglets avec **vraies données API** (plus de fixtures) :
 - **Article V2** : bouton sticky "Générer l'article V2 (Humaniser)" pleine largeur + barre de progression + polling + RichEditor TipTap + "Éléments SEO" collapsible. Désactivé tant que l'article V1 n'est pas généré
 
 **Règles UX importantes :**
-- MetaFields (Slug, Meta title, Meta description, Légende image) → **Article uniquement**, dans un collapsible "Éléments SEO"
+- Collapsible **"Titre H1"** → Article V1 et V2, avec champ H1 éditable + 10 propositions cliquables + bouton Sauvegarder
+- Collapsible **"Éléments SEO"** (Slug, Meta title, Meta description, Légende image) → Article V1 et V2, avec bouton Sauvegarder
+- Bouton **"Intro + FAQ"** → Article V1 et V2, relance uniquement chapô+intro et FAQ sans regénérer tout l'article
 - Barre d'outils RichEditor : Gras, Italique, Souligné | **H1**, H2, H3 | Liste, Liste numérotée | Tableau
 - Chaque tab reçoit `guideId` + `onRefresh` pour se connecter aux API et recharger les données
 - `TabPlan` reçoit aussi `onTabChange` pour basculer vers l'onglet Article après validation du plan
@@ -594,3 +598,15 @@ Champs **retirés de l'UI média** (restent en DB) : `productStructureTemplate`,
 | 2026-03-25 | Fix balisage titres fiches : `extractPlanSectionFromJson()` envoie le titre produit en `## (H2)` et les sous-parties SAVE en `### (H3)` — l'IA respecte le niveau exact |
 | 2026-03-25 | Prompt `prompt_generation` : instruction "BALISAGE" remplace "TITRES H2", h1 retiré des balises autorisées (le H1 est ajouté uniquement à l'assemblage final) |
 | 2026-03-25 | Retrait de `/produits` (Fiches produit) du menu sidebar — `/intelligence` (Produits) suffit, les données brutes scrappées sont redondantes |
+| 2026-03-25 | FAQ : `faq.items` retiré de l'extraction enrichment — seuls les mots-clés sont extraits, les questions sont générées librement par le prompt FAQ |
+| 2026-03-25 | Champ `h1Alternatives` ajouté au modèle Guide (migration Prisma) — 10 propositions de H1 générées par le prompt méta |
+| 2026-03-25 | Placeholder `{h1}` ajouté au prompt méta — H1 actuel injecté depuis planJson pour générer des alternatives |
+| 2026-03-25 | `parseMetaResponse()` étendu pour extraire les propositions H1 (lignes numérotées après "Propositions H1 :") |
+| 2026-03-25 | Collapsible "Titre H1" séparé de "Éléments SEO" dans Tab Article et Tab Article V2 — champ H1 éditable + 10 propositions cliquables (une par ligne) |
+| 2026-03-25 | PATCH `/api/guides/[id]` accepte `guideHtml` et `guideHtmlV2` — permet de sauvegarder le H1 modifié |
+| 2026-03-25 | Route `POST /api/guides/[id]/regenerate-intro-faq` — relance chapô+intro et FAQ sans regénérer tout l'article. Body `{ target: "v2" }` pour cibler le V2 |
+| 2026-03-25 | Bouton "Intro + FAQ" dans Tab Article et Tab Article V2 — relance uniquement chapô+intro et FAQ avec polling |
+| 2026-03-25 | Post-traitement `fixCapitalization()` : majuscule début de phrase, minuscule après `:`, majuscule premier caractère H1/H2/H3 |
+| 2026-03-25 | Post-traitement gras forcé sur `<p class="chapo">` — le contenu du chapô est automatiquement enveloppé dans `<strong>` |
+| 2026-03-25 | Température chapô+intro passée à 0.9 (au lieu de 0.7) pour plus de variété |
+| 2026-03-25 | Post-traitements documentés dans README.md (visible dans Paramètres > Doc) |
