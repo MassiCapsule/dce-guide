@@ -383,7 +383,7 @@ export async function generateEnrichments(
         maxTokens: 2048,
       }),
       chatCompletion(model, [{ role: "user", content: metaPrompt }], {
-        temperature: 0.7,
+        temperature: 0.9,
         maxTokens: 1024,
       }),
     ]);

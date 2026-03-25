@@ -107,7 +107,8 @@ Après chaque génération (article V1, V2, relance intro+FAQ), trois correction
 | Étape | Température | Modèle |
 |-------|-------------|--------|
 | Chapô + Introduction | 0.9 | `model_generation` |
-| Sommaire, Critères, FAQ, Méta | 0.7 | `model_generation` |
+| Méta + H1 (slug, meta title, description, légende, propositions H1) | 0.9 | `model_generation` |
+| Sommaire, Critères, FAQ | 0.7 | `model_generation` |
 | Fiches produits | 0.7 | `model_generation` |
 | Résumé | 0.7 | `model_generation` |
 | Humanisation (V2) | 0.7 | `model_humanization` |
