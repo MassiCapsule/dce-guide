@@ -38,6 +38,8 @@ L'IA produit un plan éditorial détaillé avec pour chaque produit :
 - Le nombre de mots cible
 - Les briefs pour le chapô, l'introduction, les critères et la FAQ
 
+Le plan est généré en double format : HTML (visible et modifiable dans l'éditeur) et JSON structuré (utilisé en interne pour garantir que chaque section est correctement extraite lors de la rédaction).
+
 Le plan est modifiable dans l'éditeur avant de passer à l'étape suivante.
 
 ### Etape 4 — Générer l'article

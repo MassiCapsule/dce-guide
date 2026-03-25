@@ -383,13 +383,19 @@ Le modèle IA est résolu dans cet ordre de priorité :
 1. `media.modelPlan` (sélecteur sur le média, éditable dans `/medias/[id]`)
 2. Config globale `model_plan` (AppConfig, éditable dans `/parametres`)
 
-Note : le prompt plan n'est plus dans Paramètres (AppConfig `prompt_plan` supprimé de l'UI). Chaque média a son propre prompt plan et modèle IA.
+Note : le prompt plan n'est plus dans Paramètres (AppConfig `prompt_plan` supprimé de l'UI). Chaque média a son propre prompt plan, structure de sortie et modèle IA.
 
-**Placeholders disponibles :** `#NomMedia`, `#MotClePrincipal`, `#NombreMots`, `#Criteres`, `#ResumeProduits`, `#MotsCles`
+Le prompt final envoyé à l'IA = `promptPlan` + `planOutputStructure` (concaténés par le code).
+
+**Placeholders disponibles dans le prompt plan :** `#NomMedia`, `#MotClePrincipal`, `#NombreMots`, `#Criteres`, `#ResumeProduits`, `#MotsCles`, `{media.toneDescription}`, `{media.writingStyle}`, `{forbiddenWords}`
+
+**Nommage aligné JSON :** les champs du prompt utilisent les mêmes noms que le JSON (`mots_cles`, `nombre_mots`, `mots_total`, etc.) et chaque section porte la mention `(JSON: "clé")`.
 
 **`#ResumeProduits`** injecte pour chaque produit : nom, marque, prix, URL Amazon (`https://www.amazon.fr/dp/[ASIN]`), résumé de positionnement.
 
-La réponse IA est nettoyée des balises markdown (` ```html ` / ` ``` `) avant sauvegarde.
+**`planOutputStructure`** : définit le format de sortie (HTML + JSON). Stocké sur le média, éditable dans `/medias`. Contient les instructions pour générer le bloc JSON entre `:::JSON_START:::` et `:::JSON_END:::`.
+
+La réponse IA est séparée : HTML (avant `:::JSON_START:::`) → `planHtml`, JSON (entre les délimiteurs) → `planJson`.
 
 ### Plan JSON structuré
 
@@ -414,7 +420,7 @@ Les placeholders `{variable}` sont remplacés par les vraies données au moment 
 
 **Placeholders disponibles :** `{media.name}`, `{media.toneDescription}`, `{media.writingStyle}`, `{doRules}`, `{dontRules}`, `{forbiddenWords}`, `{intelligence.productTitle}`, `{intelligence.shortTitle}`, `{intelligence.productBrand}`, `{intelligence.productPrice}`, `{intelligence.asin}`, `{intelligence.positioningSummary}`, `{intelligence.keyFeatures}`, `{intelligence.detectedUsages}`, `{intelligence.buyerProfiles}`, `{intelligence.strengthPoints}`, `{intelligence.weaknessPoints}`, `{intelligence.recurringProblems}`, `{intelligence.remarkableQuotes}`, `{keyword}`, `{wordCount}`, `{planSection}`, `{media.productStructureTemplate}`
 
-La section plan est extraite dans `article-generator.ts` via `extractPlanSection(planHtml, productTitle)` — compare les 20 premiers caractères du titre produit (normalisés) avec les H2 du plan.
+La section plan est extraite via `extractPlanSectionFromJson(planJson, planHtml, asin, productTitle)` — matching par ASIN exact depuis le JSON, fallback sur le parsing HTML.
 
 ---
 
@@ -445,7 +451,8 @@ Le prompt est un **template éditable** dans Paramètres > Analyse (clé `prompt
 | `dontRules` | `{dontRules}` | Règles à éviter (JSON array, une par ligne) |
 | `forbiddenWords` | `{forbiddenWords}` | Interdits lexicaux (JSON array, un par ligne) |
 | `defaultProductWordCount` | — | Nombre de mots par fiche produit |
-| `promptPlan` | — | Prompt plan spécifique au média (placeholders `#NomMedia`, etc.) |
+| `promptPlan` | — | Prompt plan spécifique au média (placeholders `#NomMedia`, etc.). Nommage aligné sur les clés JSON : `mots_cles`, `nombre_mots`, `mots_total`, `(JSON: "clé")` |
+| `planOutputStructure` | — | Structure de sortie du plan (format HTML + JSON). Concaténé après le prompt plan. |
 | `modelPlan` | — | Modèle IA pour la génération du plan (vide = config globale Paramètres) |
 
 Champs **retirés de l'UI média** (restent en DB) : `productStructureTemplate`
