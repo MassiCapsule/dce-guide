@@ -104,8 +104,7 @@ Pour chaque produit, toute la structure doit être fournie intégralement, sans 
 
 > Règles de production
 - Ne pas rédiger des phrases de l'article final. Chaque section doit uniquement comporter : un brief, la liste des mots-clés, le nombre de mots conseillé.
-- Produire le plan ENTIER en une seule fois, sans s'arrêter. Pas de plan partiel ni de fiche sans structure complète.
-- Répondre uniquement en HTML propre, sans balises html/head/body. Utiliser H1, H2, H3, p, ul, li.`;
+- Produire le plan ENTIER en une seule fois, sans s'arrêter. Pas de plan partiel ni de fiche sans structure complète.`;
 
 export async function generatePlan(guideId: string): Promise<void> {
   try {
@@ -165,13 +164,19 @@ export async function generatePlan(guideId: string): Promise<void> {
       .replace(/#ResumeProduits/g, resumeProduits || "Aucun produit")
       .replace(/#MotsCles/g, motsCles || "Aucun mot-clé");
 
-    // Instructions JSON ajoutées après le prompt média
-    const jsonInstructions = `
+    // Instructions de format ajoutées après le prompt média (commun à tous les médias)
+    const formatInstructions = `
 
-// SORTIE DOUBLE OBLIGATOIRE
-Après le plan HTML complet, vous devez produire un bloc JSON structuré entre les balises :::JSON_START::: et :::JSON_END:::
+// FORMAT DE SORTIE — DOUBLE OBLIGATOIRE
 
-Le JSON doit suivre exactement cette structure :
+PARTIE 1 : Plan HTML
+Répondre en HTML propre avec uniquement ces balises : <h1>, <h2>, <h3>, <h4>, <p>, <ul>, <li>
+Aucune autre balise autorisée. Pas de markdown. Pas de gras. Pas d'italique.
+
+PARTIE 2 : JSON structuré
+Après le plan HTML, produire un bloc JSON entre :::JSON_START::: et :::JSON_END:::
+
+Structure JSON exacte à respecter :
 {
   "H1": { "titre": "Le titre H1 du plan" },
   "chapo": { "mots_cles": ["mot1", "mot2"], "nombre_mots": 30 },
@@ -197,7 +202,7 @@ Le JSON doit suivre exactement cette structure :
   "faq": { "mots_cles": ["mot1", "mot2"] }
 }
 
-IMPORTANT pour le JSON :
+Règles JSON :
 - L'ASIN de chaque produit doit correspondre EXACTEMENT aux ASINs fournis dans les données produits
 - L'URL doit être au format https://www.amazon.fr/dp/{ASIN}
 - Les produits doivent être dans le même ordre que dans le plan HTML
@@ -207,7 +212,7 @@ IMPORTANT pour le JSON :
 - "situation" n'a PAS de h2 (pas de titre visible)
 `;
 
-    const finalPrompt = prompt + jsonInstructions;
+    const finalPrompt = prompt + formatInstructions;
 
     const completion = await chatCompletion(model, [
       { role: "system", content: finalPrompt },
