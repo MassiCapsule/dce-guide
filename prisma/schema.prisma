@@ -116,6 +116,7 @@ model Guide {
   articleSummary        String @default("")
   chapoHtml             String @default("")
   sommaireHtml          String @default("")
+  criteresHtml          String @default("")
   faqHtml               String @default("")
   metaTitle             String @default("")
   metaDescription       String @default("")

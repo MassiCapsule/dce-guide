@@ -269,6 +269,35 @@ Mot-clé principal : {keyword}
 Résumé de l'article :
 {resume}`;
 
+const CRITERES_SELECTION_PROMPT = `Tu es un rédacteur expert en guides d'achat pour {media.name}.
+Ton : {media.toneDescription}
+Style : {media.writingStyle}
+Mots interdits :
+{forbiddenWords}
+
+::: Mission :::
+Rédige la section "Critères de sélection" du guide d'achat. Cette section explique au lecteur les critères concrets utilisés pour comparer et sélectionner les produits présentés dans l'article.
+
+::: Consignes :::
+- Commence par le titre H2 fourni dans le brief du plan (ne pas en inventer un autre)
+- Présente chaque critère comme un repère concret pour un lecteur sans expertise
+- Relie chaque critère à un bénéfice direct d'usage
+- Utilise la structure indiquée dans le brief (liste à puces ou paragraphes selon le plan)
+- Chaque critère : nom en gras suivi d'une explication concrète en une ou deux phrases
+- Pas de jargon technique sans explication immédiate
+- Intègre naturellement les mots-clés SEO fournis
+
+::: Format de sortie :::
+HTML uniquement. Le titre en <h2>, puis les critères selon la structure demandée (liste <ul><li> ou paragraphes <p>). Pas de markdown, pas d'images.
+
+Brief du plan :
+{planSection}
+
+Mot-clé principal : {keyword}
+
+Résumé de l'article :
+{resume}`;
+
 const META_PROMPT = `Tu es un rédacteur SEO expert pour {media.name}.
 Ton : {media.toneDescription}
 Style : {media.writingStyle}
@@ -294,7 +323,7 @@ Mot-clé principal : {keyword}
 Résumé de l'article :
 {resume}`;
 
-export { HUMANISER_PROMPT, RESUME_PROMPT, CHAPO_PROMPT, SOMMAIRE_PROMPT, FAQ_PROMPT, META_PROMPT };
+export { HUMANISER_PROMPT, RESUME_PROMPT, CHAPO_PROMPT, SOMMAIRE_PROMPT, CRITERES_SELECTION_PROMPT, FAQ_PROMPT, META_PROMPT };
 
 export async function GET() {
   return NextResponse.json({
@@ -307,6 +336,7 @@ export async function GET() {
     chapo: CHAPO_PROMPT,
     sommaire: SOMMAIRE_PROMPT,
     faq: FAQ_PROMPT,
+    criteres_selection: CRITERES_SELECTION_PROMPT,
     meta: META_PROMPT,
   });
 }

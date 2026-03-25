@@ -4,7 +4,7 @@ import { cleanHtml, countWords } from "@/lib/generator/html-formatter";
 import { distributeKeywords } from "@/lib/keywords/distributor";
 import { getConfigModel } from "@/lib/config";
 import { calculateCost } from "@/lib/pricing";
-import { generateSummary, generateEnrichments, loadPrompt } from "./enrichment-step";
+import { generateSummary, generateEnrichments, loadPrompt, loadForbiddenWords, formatForbiddenWords } from "./enrichment-step";
 import { parsePlanJson } from "./plan-types";
 import type { Media, ProductIntelligence } from "@prisma/client";
 
@@ -157,7 +157,8 @@ export function resolveGenerationTemplate(
   keyword: string,
   wordCount: number,
   keywordAllocation: { keyword: string; targetCount: number }[],
-  planSection: string
+  planSection: string,
+  forbiddenFormatted: string = "(aucun)"
 ): string {
   const bullet = (s: string) => (s.startsWith("- ") ? s : `- ${s}`);
 
@@ -167,7 +168,6 @@ export function resolveGenerationTemplate(
 
   const doRules = parseJson(media.doRules);
   const dontRules = parseJson(media.dontRules);
-  const forbiddenWords = parseJson(media.forbiddenWords);
 
   const keywordsFormatted = keywordAllocation.length > 0
     ? keywordAllocation.map((k) => `- "${k.keyword}" : ${k.targetCount} occurrence${k.targetCount > 1 ? "s" : ""}`).join("\n")
@@ -180,7 +180,7 @@ export function resolveGenerationTemplate(
     .replace(/\{media\.productStructureTemplate\}/g, media.productStructureTemplate || "")
     .replace(/\{doRules\}/g, doRules.map(bullet).join("\n"))
     .replace(/\{dontRules\}/g, dontRules.map(bullet).join("\n"))
-    .replace(/\{forbiddenWords\}/g, forbiddenWords.map(bullet).join("\n"))
+    .replace(/\{forbiddenWords\}/g, forbiddenFormatted)
     .replace(/\{intelligence\.productTitle\}/g, intelligence.productTitle || "")
     .replace(/\{intelligence\.shortTitle\}/g, intelligence.shortTitle || "")
     .replace(/\{intelligence\.productBrand\}/g, intelligence.productBrand || "")
@@ -256,8 +256,12 @@ export async function generateArticle(guideId: string): Promise<void> {
 
     const htmlParts: string[] = [];
 
-    // Charger le template de génération depuis Paramètres
-    const generationTemplate = await loadPrompt("prompt_generation");
+    // Charger le template de génération + mots interdits depuis Paramètres
+    const [generationTemplate, forbiddenWords] = await Promise.all([
+      loadPrompt("prompt_generation"),
+      loadForbiddenWords(),
+    ]);
+    const forbiddenFormatted = formatForbiddenWords(forbiddenWords);
 
     for (let i = 0; i < readyProducts.length; i++) {
       await prisma.guide.update({
@@ -283,7 +287,8 @@ export async function generateArticle(guideId: string): Promise<void> {
         primaryKeyword,
         guide.media.defaultProductWordCount,
         [],
-        planSection
+        planSection,
+        forbiddenFormatted
       );
 
       const { stream, getUsage } = await generateStream(prompt, model);
@@ -357,7 +362,7 @@ export async function generateArticle(guideId: string): Promise<void> {
     // --- ASSEMBLAGE FINAL ---
     const enriched = await prisma.guide.findUnique({
       where: { id: guideId },
-      select: { chapoHtml: true, sommaireHtml: true, faqHtml: true },
+      select: { chapoHtml: true, sommaireHtml: true, criteresHtml: true, faqHtml: true },
     });
 
     // Extraire le H1 : JSON d'abord, sinon HTML, sinon guide.title
@@ -370,6 +375,7 @@ export async function generateArticle(guideId: string): Promise<void> {
       h1Title,
       enriched?.chapoHtml,
       enriched?.sommaireHtml,
+      enriched?.criteresHtml,
       bodyHtml,
       enriched?.faqHtml,
     ].filter(Boolean).join("\n\n");

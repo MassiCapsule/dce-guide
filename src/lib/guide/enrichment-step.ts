@@ -206,22 +206,36 @@ export async function loadPrompt(key: string): Promise<string> {
 /**
  * Replace common media / keyword / resume placeholders in a prompt string.
  */
+/**
+ * Charge les mots interdits depuis AppConfig (clé `forbidden_words`).
+ * Retourne un tableau de strings.
+ */
+export async function loadForbiddenWords(): Promise<string[]> {
+  const row = await prisma.appConfig.findUnique({ where: { key: "forbidden_words" } });
+  if (!row?.value) return [];
+  try {
+    const parsed = JSON.parse(row.value);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Formate les mots interdits en liste à puces.
+ */
+export function formatForbiddenWords(words: string[]): string {
+  return words.length > 0 ? words.map(bullet).join("\n") : "(aucun)";
+}
+
 export function resolveMediaPlaceholders(
   prompt: string,
-  media: { name: string; toneDescription: string; writingStyle: string; forbiddenWords: string },
+  media: { name: string; toneDescription: string; writingStyle: string },
   keyword: string,
   resume: string,
-  planSection: string = ""
+  planSection: string = "",
+  forbiddenFormatted: string = "(aucun)"
 ): string {
-  let forbiddenList: string[] = [];
-  try {
-    forbiddenList = JSON.parse(media.forbiddenWords || "[]");
-  } catch {
-    forbiddenList = [];
-  }
-  const forbiddenFormatted =
-    forbiddenList.length > 0 ? forbiddenList.map(bullet).join("\n") : "(aucun)";
-
   return prompt
     .replace(/\{media\.name\}/g, media.name || "")
     .replace(/\{media\.toneDescription\}/g, media.toneDescription || "")
@@ -294,11 +308,10 @@ interface EnrichmentMedia {
   name: string;
   toneDescription: string;
   writingStyle: string;
-  forbiddenWords: string;
 }
 
 /**
- * Run 4 parallel AI calls (chapo, sommaire, FAQ, meta) and persist results to DB.
+ * Run 5 parallel AI calls (chapo, sommaire, critères sélection, FAQ, meta) and persist results to DB.
  * Returns the total cost of all calls.
  */
 export async function generateEnrichments(
@@ -316,31 +329,41 @@ export async function generateEnrichments(
     extractSectionFromJson(planJson, planHtml, "Introduction"),
   ].filter(Boolean).join("\n\n");
   const sommairePlanSection = extractSectionFromJson(planJson, planHtml, "Critères");
+  const criteresSelectionPlanSection = extractSectionFromJson(planJson, planHtml, "Critères");
   const faqPlanSection = extractSectionFromJson(planJson, planHtml, "FAQ");
 
-  // Load all 4 prompts in parallel
-  const [chapoTemplate, sommaireTemplate, faqTemplate, metaTemplate] =
+  // Load all 5 prompts + forbidden words in parallel
+  const [chapoTemplate, sommaireTemplate, criteresSelectionTemplate, faqTemplate, metaTemplate, forbiddenWords] =
     await Promise.all([
       loadPrompt("prompt_chapo"),
       loadPrompt("prompt_sommaire"),
+      loadPrompt("prompt_criteres_selection"),
       loadPrompt("prompt_faq"),
       loadPrompt("prompt_meta"),
+      loadForbiddenWords(),
     ]);
 
-  // Resolve placeholders (avec section du plan correspondante)
-  const chapoPrompt = resolveMediaPlaceholders(chapoTemplate, media, keyword, summary, chapoPlanSection);
-  const sommairePrompt = resolveMediaPlaceholders(sommaireTemplate, media, keyword, summary, sommairePlanSection);
-  const faqPrompt = resolveMediaPlaceholders(faqTemplate, media, keyword, summary, faqPlanSection);
-  const metaPrompt = resolveMediaPlaceholders(metaTemplate, media, keyword, summary);
+  const forbiddenFormatted = formatForbiddenWords(forbiddenWords);
 
-  // 4 parallel AI calls
-  const [chapoResult, sommaireResult, faqResult, metaResult] =
+  // Resolve placeholders (avec section du plan correspondante)
+  const chapoPrompt = resolveMediaPlaceholders(chapoTemplate, media, keyword, summary, chapoPlanSection, forbiddenFormatted);
+  const sommairePrompt = resolveMediaPlaceholders(sommaireTemplate, media, keyword, summary, sommairePlanSection, forbiddenFormatted);
+  const criteresSelectionPrompt = resolveMediaPlaceholders(criteresSelectionTemplate, media, keyword, summary, criteresSelectionPlanSection, forbiddenFormatted);
+  const faqPrompt = resolveMediaPlaceholders(faqTemplate, media, keyword, summary, faqPlanSection, forbiddenFormatted);
+  const metaPrompt = resolveMediaPlaceholders(metaTemplate, media, keyword, summary, "", forbiddenFormatted);
+
+  // 5 parallel AI calls
+  const [chapoResult, sommaireResult, criteresSelectionResult, faqResult, metaResult] =
     await Promise.allSettled([
       chatCompletion(model, [{ role: "user", content: chapoPrompt }], {
         temperature: 0.7,
         maxTokens: 2048,
       }),
       chatCompletion(model, [{ role: "user", content: sommairePrompt }], {
+        temperature: 0.7,
+        maxTokens: 2048,
+      }),
+      chatCompletion(model, [{ role: "user", content: criteresSelectionPrompt }], {
         temperature: 0.7,
         maxTokens: 2048,
       }),
@@ -374,6 +397,14 @@ export async function generateEnrichments(
     updateData.sommaireHtml = cleanMarkdown(r.content);
   } else {
     console.error("Enrichment sommaire failed:", sommaireResult.reason);
+  }
+
+  if (criteresSelectionResult.status === "fulfilled") {
+    const r = criteresSelectionResult.value;
+    totalCost += calculateCost(model, r.promptTokens, r.completionTokens);
+    updateData.criteresHtml = cleanMarkdown(r.content);
+  } else {
+    console.error("Enrichment criteres selection failed:", criteresSelectionResult.reason);
   }
 
   if (faqResult.status === "fulfilled") {

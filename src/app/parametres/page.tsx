@@ -30,7 +30,7 @@ const MODELS = [
 const OPENAI_MODELS = MODELS.filter((m) => m.provider === "OpenAI");
 const ANTHROPIC_MODELS = MODELS.filter((m) => m.provider === "Anthropic");
 
-type PromptKey = "generation" | "analysis" | "criteres" | "humaniser" | "resume" | "chapo" | "sommaire" | "faq" | "meta";
+type PromptKey = "generation" | "analysis" | "criteres" | "humaniser" | "resume" | "chapo" | "sommaire" | "criteres_selection" | "faq" | "meta" | "forbidden_words";
 
 const PROMPT_TABS: { key: PromptKey; label: string; hasModel: boolean }[] = [
   { key: "criteres", label: "Criteres Perplexity", hasModel: false },
@@ -39,9 +39,11 @@ const PROMPT_TABS: { key: PromptKey; label: string; hasModel: boolean }[] = [
   { key: "resume", label: "Resume", hasModel: false },
   { key: "chapo", label: "Chapo + Intro", hasModel: false },
   { key: "sommaire", label: "Sommaire", hasModel: false },
+  { key: "criteres_selection", label: "Criteres selection", hasModel: false },
   { key: "faq", label: "FAQ", hasModel: false },
   { key: "meta", label: "Meta + Slug", hasModel: false },
   { key: "humaniser", label: "Humaniser", hasModel: false },
+  { key: "forbidden_words", label: "Interdits lexicaux", hasModel: false },
 ];
 
 function ModelSelector({ value, onChange }: { value: string; onChange: (v: string) => void }) {
@@ -81,8 +83,10 @@ export default function ParametresPage() {
   const [resumePrompt, setResumePrompt] = useState("");
   const [chapoPrompt, setChapoPrompt] = useState("");
   const [sommairePrompt, setSommairePrompt] = useState("");
+  const [criteresSelectionPrompt, setCriteresSelectionPrompt] = useState("");
   const [faqPrompt, setFaqPrompt] = useState("");
   const [metaPrompt, setMetaPrompt] = useState("");
+  const [forbiddenWordsText, setForbiddenWordsText] = useState("");
   const [promptTab, setPromptTab] = useState<PromptKey>("criteres");
   const [promptSaved, setPromptSaved] = useState(false);
   const [readmeContent, setReadmeContent] = useState<string>("");
@@ -116,8 +120,17 @@ export default function ParametresPage() {
         if (data.prompt_resume) setResumePrompt(data.prompt_resume);
         if (data.prompt_chapo) setChapoPrompt(data.prompt_chapo);
         if (data.prompt_sommaire) setSommairePrompt(data.prompt_sommaire);
+        if (data.prompt_criteres_selection) setCriteresSelectionPrompt(data.prompt_criteres_selection);
         if (data.prompt_faq) setFaqPrompt(data.prompt_faq);
         if (data.prompt_meta) setMetaPrompt(data.prompt_meta);
+        if (data.forbidden_words) {
+          try {
+            const words = JSON.parse(data.forbidden_words);
+            setForbiddenWordsText(Array.isArray(words) ? words.join("\n") : "");
+          } catch {
+            setForbiddenWordsText("");
+          }
+        }
         if (data.serpmantics_api_key) setSerpmanticsKey(data.serpmantics_api_key);
       });
     fetch("/api/config/keys").then((r) => r.json()).then(setKeys);
@@ -132,6 +145,7 @@ export default function ParametresPage() {
         setResumePrompt((prev) => prev || defaults.resume);
         setChapoPrompt((prev) => prev || defaults.chapo);
         setSommairePrompt((prev) => prev || defaults.sommaire);
+        setCriteresSelectionPrompt((prev) => prev || defaults.criteres_selection);
         setFaqPrompt((prev) => prev || defaults.faq);
         setMetaPrompt((prev) => prev || defaults.meta);
       });
@@ -202,6 +216,11 @@ export default function ParametresPage() {
       fetch("/api/config", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ key: "prompt_criteres_selection", value: criteresSelectionPrompt }),
+      }),
+      fetch("/api/config", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ key: "prompt_faq", value: faqPrompt }),
       }),
       fetch("/api/config", {
@@ -209,10 +228,20 @@ export default function ParametresPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ key: "prompt_meta", value: metaPrompt }),
       }),
+      fetch("/api/config", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          key: "forbidden_words",
+          value: JSON.stringify(
+            forbiddenWordsText.split("\n").map((w: string) => w.trim()).filter((w: string) => w.length > 0)
+          ),
+        }),
+      }),
     ]);
     setPromptSaved(true);
     setTimeout(() => setPromptSaved(false), 2000);
-  }, [generationPrompt, analysisPrompt, criteresPrompt, humaniserPrompt, resumePrompt, chapoPrompt, sommairePrompt, faqPrompt, metaPrompt]);
+  }, [generationPrompt, analysisPrompt, criteresPrompt, humaniserPrompt, resumePrompt, chapoPrompt, sommairePrompt, criteresSelectionPrompt, faqPrompt, metaPrompt, forbiddenWordsText]);
 
   const saveApiKey = async (configKey: string, value: string, setSaved: (v: boolean) => void) => {
     await fetch("/api/config", {
@@ -232,8 +261,10 @@ export default function ParametresPage() {
     if (tab === "resume") return resumePrompt;
     if (tab === "chapo") return chapoPrompt;
     if (tab === "sommaire") return sommairePrompt;
+    if (tab === "criteres_selection") return criteresSelectionPrompt;
     if (tab === "faq") return faqPrompt;
     if (tab === "meta") return metaPrompt;
+    if (tab === "forbidden_words") return forbiddenWordsText;
     return criteresPrompt;
   };
 
@@ -245,8 +276,10 @@ export default function ParametresPage() {
     else if (tab === "resume") setResumePrompt(value);
     else if (tab === "chapo") setChapoPrompt(value);
     else if (tab === "sommaire") setSommairePrompt(value);
+    else if (tab === "criteres_selection") setCriteresSelectionPrompt(value);
     else if (tab === "faq") setFaqPrompt(value);
     else if (tab === "meta") setMetaPrompt(value);
+    else if (tab === "forbidden_words") setForbiddenWordsText(value);
   };
 
   const currentTabConfig = PROMPT_TABS.find((t) => t.key === promptTab)!;
@@ -313,13 +346,28 @@ export default function ParametresPage() {
                     </div>
                   )}
 
-                  {/* Prompt textarea */}
-                  <textarea
-                    value={getPromptValue(promptTab)}
-                    onChange={(e) => setPromptValue(promptTab, e.target.value)}
-                    className="w-full h-[500px] text-xs bg-muted p-4 rounded-lg font-mono leading-relaxed resize-y border-0 focus:outline-none focus:ring-2 focus:ring-ring"
-                    spellCheck={false}
-                  />
+                  {/* Prompt textarea or forbidden words textarea */}
+                  {promptTab === "forbidden_words" ? (
+                    <div className="space-y-2">
+                      <p className="text-xs text-muted-foreground">
+                        Mots et expressions a ne jamais utiliser dans les contenus generes (un par ligne). Variable : <code className="bg-muted-foreground/10 px-1 rounded">{"{forbiddenWords}"}</code>
+                      </p>
+                      <textarea
+                        value={forbiddenWordsText}
+                        onChange={(e) => setForbiddenWordsText(e.target.value)}
+                        className="w-full h-[500px] text-sm bg-muted p-4 rounded-lg leading-relaxed resize-y border-0 focus:outline-none focus:ring-2 focus:ring-ring"
+                        placeholder="Un mot ou expression par ligne"
+                        spellCheck={false}
+                      />
+                    </div>
+                  ) : (
+                    <textarea
+                      value={getPromptValue(promptTab)}
+                      onChange={(e) => setPromptValue(promptTab, e.target.value)}
+                      className="w-full h-[500px] text-xs bg-muted p-4 rounded-lg font-mono leading-relaxed resize-y border-0 focus:outline-none focus:ring-2 focus:ring-ring"
+                      spellCheck={false}
+                    />
+                  )}
                 </div>
               </CardContent>
             </Card>
