@@ -34,6 +34,9 @@ export function stripBoldFromBody(html: string): string {
   // Supprimer le gras partout ailleurs
   result = result.replace(/<\/?strong>/gi, "");
 
+  // Supprimer tous les italiques
+  result = result.replace(/<\/?em>/gi, "");
+
   // Restaurer les sections préservées
   for (let i = 0; i < preserved.length; i++) {
     result = result.replace(`__PRESERVED_${i}__`, preserved[i]);
