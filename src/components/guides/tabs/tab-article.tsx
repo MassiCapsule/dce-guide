@@ -1,7 +1,9 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Loader2, ChevronDown, ChevronUp, Sparkles } from "lucide-react";
+import { Loader2, ChevronDown, ChevronUp, Sparkles, RefreshCw } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { SeoScoreBar } from "@/components/editor/seo-score-bar";
 import { MetaFields } from "@/components/editor/meta-fields";
 import { RichEditor } from "@/components/editor/rich-editor";
@@ -27,10 +29,20 @@ interface TabArticleProps {
     metaDescription: string;
     imageCaption: string;
   };
+  h1Alternatives?: string[];
   onRefresh: () => void;
 }
 
 type GenerationPhase = "idle" | "distributing" | "generating" | "summarizing" | "enriching" | "complete";
+
+function extractH1(htmlStr: string): string {
+  const match = htmlStr.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i);
+  return match ? match[1].replace(/<[^>]+>/g, "").trim() : "";
+}
+
+function replaceH1(htmlStr: string, newH1: string): string {
+  return htmlStr.replace(/<h1[^>]*>[\s\S]*?<\/h1>/i, `<h1>${newH1}</h1>`);
+}
 
 export function TabArticle({
   guideId,
@@ -39,15 +51,19 @@ export function TabArticle({
   seoKeywords,
   serpanticsUrl,
   meta: metaProp,
+  h1Alternatives = [],
   onRefresh,
 }: TabArticleProps) {
   const [html, setHtml] = useState<string>(initialHtml);
   const [meta, setMeta] = useState(metaProp);
+  const [currentH1, setCurrentH1] = useState<string>(extractH1(initialHtml));
   const [score, setScore] = useState<number | null>(seoScore);
   const [keywords, setKeywords] = useState<SeoKeyword[]>(seoKeywords);
   const [scoreLoading, setScoreLoading] = useState<boolean>(false);
   const [generating, setGenerating] = useState<boolean>(false);
+  const [regenerating, setRegenerating] = useState<boolean>(false);
   const [generateError, setGenerateError] = useState<string | null>(null);
+  const [h1Open, setH1Open] = useState<boolean>(false);
   const [seoOpen, setSeoOpen] = useState<boolean>(false);
   const [phase, setPhase] = useState<GenerationPhase>("idle");
   const [currentStep, setCurrentStep] = useState<number>(0);
@@ -57,6 +73,7 @@ export function TabArticle({
   // Sync if parent reloads guide data
   useEffect(() => {
     setHtml(initialHtml);
+    setCurrentH1(extractH1(initialHtml));
   }, [initialHtml]);
 
   function stopPolling() {
@@ -72,11 +89,16 @@ export function TabArticle({
     setMeta((prev) => ({ ...prev, [field]: value }));
   };
 
+  const handleH1Change = (newH1: string) => {
+    setCurrentH1(newH1);
+    setHtml((prev) => replaceH1(prev, newH1));
+  };
+
   const handleSaveMeta = async () => {
     await fetch(`/api/guides/${guideId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(meta),
+      body: JSON.stringify({ ...meta, guideHtml: html }),
     });
   };
 
@@ -158,6 +180,7 @@ export function TabArticle({
         if (guideRes.ok) {
           const guide = await guideRes.json();
           setHtml(guide.guideHtml || "");
+          setCurrentH1(extractH1(guide.guideHtml || ""));
           setMeta({
             slug: guide.slug || "",
             metaTitle: guide.metaTitle || "",
@@ -176,6 +199,46 @@ export function TabArticle({
     }, 3000);
   }
 
+  async function handleRegenerateIntroFaq() {
+    setRegenerating(true);
+    setGenerateError(null);
+    setPhase("enriching");
+
+    const res = await fetch(`/api/guides/${guideId}/regenerate-intro-faq`, { method: "POST" });
+    if (!res.ok) {
+      const data = await res.json();
+      setGenerateError(data.error || "Erreur démarrage");
+      setRegenerating(false);
+      setPhase("idle");
+      return;
+    }
+
+    pollRef.current = setInterval(async () => {
+      const pollRes = await fetch(`/api/guides/${guideId}/status`);
+      if (!pollRes.ok) return;
+      const data = await pollRes.json();
+
+      if (data.status === "complete") {
+        setPhase("complete");
+        setRegenerating(false);
+        stopPolling();
+        const guideRes = await fetch(`/api/guides/${guideId}`);
+        if (guideRes.ok) {
+          const guide = await guideRes.json();
+          setHtml(guide.guideHtml || "");
+          setCurrentH1(extractH1(guide.guideHtml || ""));
+        }
+        setTimeout(() => setPhase("idle"), 1500);
+        onRefresh();
+      } else if (data.status === "error") {
+        setGenerateError(data.errorMessage || "Erreur inconnue");
+        setRegenerating(false);
+        setPhase("idle");
+        stopPolling();
+      }
+    }, 3000);
+  }
+
   return (
     <div className="space-y-4 pb-20">
       <SeoScoreBar
@@ -186,6 +249,55 @@ export function TabArticle({
         disabled={!html || !serpanticsUrl}
         serpanticsUrl={serpanticsUrl}
       />
+
+      {/* Collapsible H1 */}
+      <div className="border rounded-md overflow-hidden">
+        <button
+          type="button"
+          onClick={() => setH1Open((v) => !v)}
+          className="w-full flex items-center justify-between px-4 py-2.5 bg-muted/40 hover:bg-muted/60 transition-colors text-sm font-medium"
+        >
+          Titre H1
+          {h1Open ? (
+            <ChevronUp className="h-4 w-4 text-muted-foreground" />
+          ) : (
+            <ChevronDown className="h-4 w-4 text-muted-foreground" />
+          )}
+        </button>
+        {h1Open && (
+          <div className="p-4 bg-muted/20 space-y-3">
+            <div>
+              <Label className="text-xs">Titre H1 actuel</Label>
+              <Input
+                value={currentH1}
+                onChange={(e) => handleH1Change(e.target.value)}
+                placeholder="Titre H1 de l'article"
+                className="mt-1 text-sm font-medium"
+              />
+            </div>
+            {h1Alternatives.length > 0 && (
+              <div className="space-y-1.5">
+                <p className="text-xs text-muted-foreground">Propositions :</p>
+                <div className="flex flex-col gap-1.5">
+                  {h1Alternatives.map((alt, i) => (
+                    <button
+                      key={i}
+                      type="button"
+                      className="w-full text-left text-sm font-medium px-3 py-2 rounded-md border bg-background hover:bg-muted/60 transition-colors cursor-pointer"
+                      onClick={() => handleH1Change(alt)}
+                    >
+                      {i + 1}. {alt}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+            <Button variant="outline" size="sm" onClick={handleSaveMeta}>
+              Sauvegarder
+            </Button>
+          </div>
+        )}
+      </div>
 
       {/* Collapsible Éléments SEO */}
       <div className="border rounded-md overflow-hidden">
@@ -241,24 +353,41 @@ export function TabArticle({
           <p className="text-sm text-red-600 mb-2">{generateError}</p>
         )}
 
-        <Button
-          onClick={handleGenerate}
-          disabled={generating}
-          className="w-full"
-          size="lg"
-        >
-          {generating ? (
-            <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Génération en cours…
-            </>
-          ) : (
-            <>
-              <Sparkles className="mr-2 h-4 w-4" />
-              Générer l&apos;article (IA)
-            </>
+        <div className="flex gap-2">
+          <Button
+            onClick={handleGenerate}
+            disabled={generating || regenerating}
+            className="flex-1"
+            size="lg"
+          >
+            {generating ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Génération en cours…
+              </>
+            ) : (
+              <>
+                <Sparkles className="mr-2 h-4 w-4" />
+                Générer l&apos;article (IA)
+              </>
+            )}
+          </Button>
+          {html && (
+            <Button
+              onClick={handleRegenerateIntroFaq}
+              disabled={generating || regenerating}
+              variant="outline"
+              size="lg"
+            >
+              {regenerating ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <RefreshCw className="h-4 w-4" />
+              )}
+              <span className="ml-2 hidden sm:inline">Intro + FAQ</span>
+            </Button>
           )}
-        </Button>
+        </div>
       </div>
     </div>
   );

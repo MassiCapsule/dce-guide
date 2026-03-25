@@ -41,6 +41,8 @@ export async function PATCH(req: Request, { params }: RouteParams) {
   if (body.metaTitle !== undefined) data.metaTitle = body.metaTitle;
   if (body.metaDescription !== undefined) data.metaDescription = body.metaDescription;
   if (body.imageCaption !== undefined) data.imageCaption = body.imageCaption;
+  if (body.guideHtml !== undefined) data.guideHtml = body.guideHtml;
+  if (body.guideHtmlV2 !== undefined) data.guideHtmlV2 = body.guideHtmlV2;
 
   const guide = await prisma.guide.update({
     where: { id },

@@ -59,6 +59,7 @@ interface Guide {
   planHtml: string;
   guideHtml: string;
   guideHtmlV2: string;
+  h1Alternatives: string;
   createdAt: string;
   updatedAt: string;
   products: GuideProduct[];
@@ -271,6 +272,7 @@ export default function GuideDetailPage() {
               seoKeywords={(() => { try { return JSON.parse(guide.seoKeywords); } catch { return []; } })()}
               serpanticsUrl={guide.serpanticsGuideId ? `https://app.serpmantics.com/${guide.serpanticsGuideId}/edit` : undefined}
               meta={{ slug: guide.slug || "", metaTitle: guide.metaTitle || "", metaDescription: guide.metaDescription || "", imageCaption: guide.imageCaption || "" }}
+              h1Alternatives={(() => { try { return JSON.parse(guide.h1Alternatives || "[]"); } catch { return []; } })()}
               onRefresh={loadGuide}
             />
           </TabsContent>
@@ -284,6 +286,7 @@ export default function GuideDetailPage() {
               seoKeywords={(() => { try { return JSON.parse(guide.seoKeywords); } catch { return []; } })()}
               serpanticsUrl={guide.serpanticsGuideId ? `https://app.serpmantics.com/${guide.serpanticsGuideId}/edit` : undefined}
               meta={{ slug: guide.slug || "", metaTitle: guide.metaTitle || "", metaDescription: guide.metaDescription || "", imageCaption: guide.imageCaption || "" }}
+              h1Alternatives={(() => { try { return JSON.parse(guide.h1Alternatives || "[]"); } catch { return []; } })()}
               onRefresh={loadGuide}
             />
           </TabsContent>

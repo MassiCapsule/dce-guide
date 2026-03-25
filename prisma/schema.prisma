@@ -122,6 +122,7 @@ model Guide {
   metaDescription       String @default("")
   imageCaption          String @default("")
   slug                  String @default("")
+  h1Alternatives        String @default("[]") // JSON: ["titre1", "titre2", ...]
   guideWordCount        Int    @default(0)
   guidePromptUsed       String @default("")
   guideModelUsed        String @default("gpt-4o")

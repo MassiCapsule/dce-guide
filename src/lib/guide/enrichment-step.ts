@@ -38,6 +38,46 @@ export function stripBoldFromBody(html: string): string {
   return result;
 }
 
+/**
+ * Post-traitement typographique :
+ * - Majuscule en début de phrase (après . ! ?)
+ * - Minuscule après ":"
+ * Ne touche pas le contenu des balises HTML.
+ */
+export function fixCapitalization(html: string): string {
+  // 1. Majuscule sur le premier caractère des titres H1/H2/H3
+  let result = html.replace(
+    /(<h[1-3][^>]*>)([a-zà-ö])/gi,
+    (_, tag: string, letter: string) => `${tag}${letter.toUpperCase()}`
+  );
+
+  // 2. Traiter le texte entre les balises (pas dans les balises elles-mêmes)
+  result = result.replace(/>([^<]+)</g, (_, text: string) => {
+    let fixed = text;
+    // Minuscule après ":"
+    fixed = fixed.replace(/:\s+([A-ZÀ-Ö])/g, (_match, letter: string) => {
+      return `: ${letter.toLowerCase()}`;
+    });
+    // Majuscule en début de phrase (après . ! ? suivis d'un espace)
+    fixed = fixed.replace(/([.!?])\s+([a-zà-ö])/g, (_match, punct: string, letter: string) => {
+      return `${punct} ${letter.toUpperCase()}`;
+    });
+    return `>${fixed}<`;
+  });
+
+  // 3. Forcer le gras dans le chapô <p class="chapo">
+  result = result.replace(
+    /<p([^>]*class="chapo"[^>]*)>([\s\S]*?)<\/p>/gi,
+    (_match, attrs: string, content: string) => {
+      // Retirer les <strong> existants pour éviter le double
+      const clean = content.replace(/<\/?strong>/gi, "").trim();
+      return `<p${attrs}><strong>${clean}</strong></p>`;
+    }
+  );
+
+  return result;
+}
+
 function cleanMarkdown(text: string): string {
   return text
     .replace(/^```html\s*/i, "")
@@ -123,12 +163,6 @@ function extractSectionFromJson(
     if (plan.faq.nombre_mots) {
       text += `Nombre de mots : ${plan.faq.nombre_mots}\n`;
     }
-    if (plan.faq.items?.length) {
-      text += `\nQuestions à traiter (dans cet ordre exact) :\n`;
-      plan.faq.items.forEach((item, i) => {
-        text += `${i + 1}. ${item.nom}\n`;
-      });
-    }
     return text.trim();
   }
 
@@ -213,11 +247,13 @@ export interface MetaFields {
   metaTitle: string;
   metaDescription: string;
   imageCaption: string;
+  h1Alternatives: string[];
 }
 
 /**
  * Parse the structured text response from the meta AI call.
  * Handles accented labels (Slug, Meta/Méta Title, Meta/Méta Description, Légende/Legende).
+ * Extracts H1 alternatives from numbered list after "Propositions H1".
  */
 export function parseMetaResponse(text: string): MetaFields {
   const slugMatch = text.match(/Slug\s*:\s*(.+)/i);
@@ -225,11 +261,25 @@ export function parseMetaResponse(text: string): MetaFields {
   const descMatch = text.match(/M[eé]ta\s+Description\s*(?:\([^)]*\))?\s*:\s*(.+)/i);
   const captionMatch = text.match(/L[eé]gende\s*:\s*(.+)/i);
 
+  // Extract H1 alternatives: numbered lines after "Propositions H1"
+  const h1Alternatives: string[] = [];
+  const h1SectionMatch = text.match(/Propositions\s+H1\s*:?\s*\n([\s\S]*)/i);
+  if (h1SectionMatch) {
+    const lines = h1SectionMatch[1].split("\n");
+    for (const line of lines) {
+      const match = line.match(/^\d+\.\s*(.+)/);
+      if (match) {
+        h1Alternatives.push(match[1].trim());
+      }
+    }
+  }
+
   return {
     slug: slugMatch?.[1]?.trim() || "",
     metaTitle: titleMatch?.[1]?.trim() || "",
     metaDescription: descMatch?.[1]?.trim() || "",
     imageCaption: captionMatch?.[1]?.trim() || "",
+    h1Alternatives,
   };
 }
 
@@ -307,13 +357,17 @@ export async function generateEnrichments(
   const sommairePrompt = resolveMediaPlaceholders(sommaireTemplate, media, keyword, summary, sommairePlanSection, forbiddenFormatted);
   const criteresSelectionPrompt = resolveMediaPlaceholders(criteresSelectionTemplate, media, keyword, summary, criteresSelectionPlanSection, forbiddenFormatted);
   const faqPrompt = resolveMediaPlaceholders(faqTemplate, media, keyword, summary, faqPlanSection, forbiddenFormatted);
-  const metaPrompt = resolveMediaPlaceholders(metaTemplate, media, keyword, summary, "", forbiddenFormatted);
+  // Extraire le H1 actuel depuis le plan JSON pour le prompt méta
+  const planData = parsePlanJson(planJson);
+  const currentH1 = planData?.H1?.titre || "";
+  const metaPrompt = resolveMediaPlaceholders(metaTemplate, media, keyword, summary, "", forbiddenFormatted)
+    .replace(/\{h1\}/g, currentH1);
 
   // 5 parallel AI calls
   const [chapoResult, sommaireResult, criteresSelectionResult, faqResult, metaResult] =
     await Promise.allSettled([
       chatCompletion(model, [{ role: "user", content: chapoPrompt }], {
-        temperature: 0.7,
+        temperature: 0.9,
         maxTokens: 2048,
       }),
       chatCompletion(model, [{ role: "user", content: sommairePrompt }], {
@@ -380,11 +434,82 @@ export async function generateEnrichments(
     updateData.metaTitle = meta.metaTitle;
     updateData.metaDescription = meta.metaDescription;
     updateData.imageCaption = meta.imageCaption;
+    updateData.h1Alternatives = JSON.stringify(meta.h1Alternatives);
   } else {
     console.error("Enrichment meta failed:", metaResult.reason);
   }
 
   // Single DB update with all results
+  if (Object.keys(updateData).length > 0) {
+    await prisma.guide.update({
+      where: { id: guideId },
+      data: updateData,
+    });
+  }
+
+  return { totalCost };
+}
+
+// ---------------------------------------------------------------------------
+// regenerateChapoAndFaq — relance uniquement chapô+intro et FAQ
+// ---------------------------------------------------------------------------
+
+export async function regenerateChapoAndFaq(
+  guideId: string,
+  summary: string,
+  media: EnrichmentMedia,
+  keyword: string,
+  model: string,
+  planJson: string = ""
+): Promise<{ totalCost: number }> {
+  const chapoPlanSection = [
+    extractSectionFromJson(planJson, "Chapô"),
+    extractSectionFromJson(planJson, "Introduction"),
+  ].filter(Boolean).join("\n\n");
+  const faqPlanSection = extractSectionFromJson(planJson, "FAQ");
+
+  const [chapoTemplate, faqTemplate, forbiddenWords] = await Promise.all([
+    loadPrompt("prompt_chapo"),
+    loadPrompt("prompt_faq"),
+    loadForbiddenWords(),
+  ]);
+
+  const forbiddenFormatted = formatForbiddenWords(forbiddenWords);
+
+  const chapoPrompt = resolveMediaPlaceholders(chapoTemplate, media, keyword, summary, chapoPlanSection, forbiddenFormatted);
+  const faqPrompt = resolveMediaPlaceholders(faqTemplate, media, keyword, summary, faqPlanSection, forbiddenFormatted);
+
+  const [chapoResult, faqResult] = await Promise.allSettled([
+    chatCompletion(model, [{ role: "user", content: chapoPrompt }], {
+      temperature: 0.7,
+      maxTokens: 2048,
+    }),
+    chatCompletion(model, [{ role: "user", content: faqPrompt }], {
+      temperature: 0.7,
+      maxTokens: 2048,
+    }),
+  ]);
+
+  let totalCost = 0;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const updateData: Record<string, any> = {};
+
+  if (chapoResult.status === "fulfilled") {
+    const r = chapoResult.value;
+    totalCost += calculateCost(model, r.promptTokens, r.completionTokens);
+    updateData.chapoHtml = cleanMarkdown(r.content);
+  } else {
+    console.error("Regenerate chapo failed:", chapoResult.reason);
+  }
+
+  if (faqResult.status === "fulfilled") {
+    const r = faqResult.value;
+    totalCost += calculateCost(model, r.promptTokens, r.completionTokens);
+    updateData.faqHtml = cleanMarkdown(r.content);
+  } else {
+    console.error("Regenerate faq failed:", faqResult.reason);
+  }
+
   if (Object.keys(updateData).length > 0) {
     await prisma.guide.update({
       where: { id: guideId },
