@@ -48,7 +48,7 @@ Générateur de guides d'achat SEO avec fiches produits Amazon.
 | Fichier | Rôle |
 |---------|------|
 | `src/components/guides/guide-form.tsx` | Formulaire création guides (keyword + media uniquement) — sans critères, sans ASINs |
-| `src/app/parametres/page.tsx` | Page config : 3 onglets (Prompts, Clés API, Doc). 11 sous-onglets prompts (dont Critères sélection + Interdits lexicaux). Doc affiche le README |
+| `src/app/parametres/page.tsx` | Page config : 3 onglets (Prompts, Clés API, Doc). 12 sous-onglets prompts (dont Critères sélection, Interdits lexicaux, Post-traitement en lecture seule). Doc affiche le README |
 | `src/app/playground/page.tsx` | Playground : sélecteur guide → produit → prompt résolu complet → génération → humanisation V2 |
 | `src/components/editor/rich-editor.tsx` | Éditeur WYSIWYG TipTap v3 (H1/H2/H3, gras, listes, tableau, bouton copier formaté) |
 | `src/components/editor/seo-score-bar.tsx` | Barre score SEO Serpmantics + pills mots-clés |
@@ -610,3 +610,9 @@ Champs **retirés de l'UI média** (restent en DB) : `productStructureTemplate`,
 | 2026-03-25 | Post-traitement gras forcé sur `<p class="chapo">` — le contenu du chapô est automatiquement enveloppé dans `<strong>` |
 | 2026-03-25 | Température chapô+intro passée à 0.9 (au lieu de 0.7) pour plus de variété |
 | 2026-03-25 | Post-traitements documentés dans README.md (visible dans Paramètres > Doc) |
+| 2026-03-25 | Suppression automatique des italiques (`<em>`) dans le post-traitement |
+| 2026-03-25 | Liens Amazon avec tag affilié : `amazon.fr/dp/ASIN?tag=dce-{motcle}-{DDMMYY}-21` — transformé automatiquement dans `fixCapitalization()` |
+| 2026-03-25 | Bouton "VOIR SUR AMAZON" ajouté en `<p><strong>` après chaque ligne URL+prix — préservé par `stripBoldFromBody()` |
+| 2026-03-25 | Image produit (`productImageUrl`) injectée automatiquement après le H2 de chaque fiche produit lors de l'assemblage |
+| 2026-03-25 | Température méta (slug, meta title, propositions H1) passée à 0.9 |
+| 2026-03-25 | Onglet "Post-traitement" en lecture seule dans Paramètres > Prompts — liste les 9 règles auto + tableau des températures IA |
