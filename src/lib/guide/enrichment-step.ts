@@ -75,9 +75,9 @@ export function fixCapitalization(html: string): string {
     }
   );
 
-  // 4. Ajouter bouton "VOIR SUR AMAZON" après la ligne URL + prix
+  // 4. Ajouter bouton "VOIR SUR AMAZON" après la ligne URL + prix (si pas déjà présent)
   result = result.replace(
-    /(<p>(?:[^<]*)?https:\/\/www\.amazon\.fr\/dp\/[A-Z0-9]+[^<]*<\/p>)/gi,
+    /(<p>(?:[^<]*)?https:\/\/www\.amazon\.fr\/dp\/[A-Z0-9]+[^<]*<\/p>)(?!\s*<p><strong>VOIR SUR AMAZON<\/strong><\/p>)/gi,
     '$1\n<p><strong>VOIR SUR AMAZON</strong></p>'
   );
 
