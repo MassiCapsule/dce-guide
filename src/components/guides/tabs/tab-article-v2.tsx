@@ -31,6 +31,7 @@ interface TabArticleV2Props {
     imageCaption: string;
   };
   h1Alternatives?: string[];
+  initialHtmlV1?: string;
   onRefresh: () => void;
 }
 
@@ -52,6 +53,7 @@ export function TabArticleV2({
   serpanticsUrl,
   meta: metaProp,
   h1Alternatives = [],
+  initialHtmlV1 = "",
   onRefresh,
 }: TabArticleV2Props) {
   const [html, setHtml] = useState<string>(initialHtml);
@@ -65,8 +67,58 @@ export function TabArticleV2({
   const [generateError, setGenerateError] = useState<string | null>(null);
   const [h1Open, setH1Open] = useState<boolean>(false);
   const [seoOpen, setSeoOpen] = useState<boolean>(false);
+  const [v1Open, setV1Open] = useState<boolean>(false);
   const [progress, setProgress] = useState<number>(0);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Auto-detect si humanisation en cours (lancée par V1)
+  useEffect(() => {
+    if (!initialHtml && hasV1) {
+      // Pas de V2 mais V1 existe → vérifier si humanisation en cours
+      (async () => {
+        const res = await fetch(`/api/guides/${guideId}/status`);
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data.status === "humanizing") {
+          setGenerating(true);
+          setProgress(10);
+          // Progression simulée
+          let tick = 10;
+          const progressInterval = setInterval(() => {
+            tick = Math.min(tick + 3, 90);
+            setProgress(tick);
+          }, 2000);
+          // Polling
+          pollRef.current = setInterval(async () => {
+            const pollRes = await fetch(`/api/guides/${guideId}/status`);
+            if (!pollRes.ok) return;
+            const d = await pollRes.json();
+            if (d.status === "complete") {
+              clearInterval(progressInterval);
+              setProgress(100);
+              setGenerating(false);
+              stopPolling();
+              const guideRes = await fetch(`/api/guides/${guideId}`);
+              if (guideRes.ok) {
+                const guide = await guideRes.json();
+                setHtml(guide.guideHtmlV2 || "");
+                setCurrentH1(extractH1(guide.guideHtmlV2 || ""));
+              }
+              setTimeout(() => setProgress(0), 1500);
+              onRefresh();
+            } else if (d.status === "error") {
+              clearInterval(progressInterval);
+              setGenerateError(d.errorMessage || "Erreur inconnue");
+              setGenerating(false);
+              setProgress(0);
+              stopPolling();
+            }
+          }, 3000);
+        }
+      })();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     setHtml(initialHtml);
@@ -300,6 +352,27 @@ export function TabArticleV2({
       </div>
 
       <RichEditor content={html} onChange={setHtml} />
+
+      {/* Collapsible Article V1 */}
+      {initialHtmlV1 && (
+        <div className="border rounded-md overflow-hidden">
+          <button
+            type="button"
+            onClick={() => setV1Open((v) => !v)}
+            className="w-full flex items-center justify-between px-4 py-2.5 bg-muted/40 hover:bg-muted/60 transition-colors text-sm font-medium"
+          >
+            Article V1 (original)
+            {v1Open ? (
+              <ChevronUp className="h-4 w-4 text-muted-foreground" />
+            ) : (
+              <ChevronDown className="h-4 w-4 text-muted-foreground" />
+            )}
+          </button>
+          {v1Open && (
+            <div className="p-4 bg-muted/20 prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: initialHtmlV1 }} />
+          )}
+        </div>
+      )}
 
       {/* Bouton flottant sticky en bas */}
       <div className="sticky bottom-0 z-10 -mx-6 px-6 py-3 bg-background/95 backdrop-blur-sm border-t">

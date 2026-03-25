@@ -288,6 +288,7 @@ export default function GuideDetailPage() {
               serpanticsUrl={guide.serpanticsGuideId ? `https://app.serpmantics.com/${guide.serpanticsGuideId}/edit` : undefined}
               meta={{ slug: guide.slug || "", metaTitle: guide.metaTitle || "", metaDescription: guide.metaDescription || "", imageCaption: guide.imageCaption || "" }}
               h1Alternatives={(() => { try { return JSON.parse(guide.h1Alternatives || "[]"); } catch { return []; } })()}
+              initialHtmlV1={guide.guideHtml}
               onRefresh={loadGuide}
             />
           </TabsContent>

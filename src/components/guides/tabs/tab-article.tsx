@@ -190,6 +190,8 @@ export function TabArticle({
             imageCaption: guide.imageCaption || "",
           });
         }
+        // Lancer automatiquement l'humanisation V2
+        fetch(`/api/guides/${guideId}/humanize`, { method: "POST" }).catch(console.error);
         setTimeout(() => {
           setPhase("idle");
           if (onTabChange) onTabChange("article-v2");
