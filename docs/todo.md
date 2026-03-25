@@ -13,7 +13,7 @@
 - [x] **Plan structuré JSON** : générer un JSON structuré en plus du HTML pour fiabiliser l'extraction des sections — implémenté le 2026-03-25
 - [x] **Article — Critères de sélection** : ajouter la section "Critères de sélection" dans l'article (nouveau prompt `prompt_criteres_selection`, nouveau champ DB `criteresHtml`, intégré dans l'assemblage entre sommaire et fiches produits) — implémenté le 2026-03-25
 - [ ] **Article — Titre FAQ** : le prompt FAQ doit générer un titre H2 éditorialisé (avec le mot-clé principal) avant les questions
-- [ ] **Optimisation coûts** : utiliser un modèle moins cher (Claude Haiku 4) pour l'analyse des avis (extraction de données, pas de rédaction créative) — ~10x moins cher pour un résultat comparable
+- [x] **Optimisation coûts** : modèle IA configurable — désormais 2 modèles (V1 + V2) dans Paramètres > Clés API. L'utilisateur choisit le modèle adapté
 - [ ] **Distribution mots-clés** : actuellement commentée — les mots-clés sont gérés par le plan via `{planSection}`. Réactiver si le score SEO Serpmantics est insuffisant
 - [ ] **Fiches produits — vérification process** : vérifier que le pipeline de génération des fiches respecte bien le plan (H2 exacts, briefs suivis, pas de contamination entre produits, bon prix/URL par fiche)
 - [ ] **Estimation coût article** : calculer le coût total d'une rédaction complète (ajout produits → scraping → analyse → plan → article V1 → enrichissements → humanisation V2), basé sur le modèle et le nombre de produits

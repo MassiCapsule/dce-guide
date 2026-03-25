@@ -100,12 +100,12 @@ Générateur de guides d'achat SEO avec fiches produits Amazon.
 | `src/lib/prisma.ts` | Client Prisma singleton |
 | `src/lib/keywords/distributor.ts` | Distribution mots-clés entre produits |
 | `src/lib/guide/pipeline.ts` | (legacy) Pipeline complet monolithique |
-| `src/lib/guide/scrape-step.ts` | Scraping Apify + analyse IA (modèle `model_analysis`) + tri par prix croissant — status: scraping → analyzing → products-ready |
+| `src/lib/guide/scrape-step.ts` | Scraping Apify + analyse IA (modèle `model_generation`) + tri par prix croissant — status: scraping → analyzing → products-ready |
 | `src/lib/guide/plan-types.ts` | Types TypeScript pour le plan JSON structuré + helper `parsePlanJson()` |
-| `src/lib/guide/plan-generator.ts` | Génération du plan IA (modèle `model_plan`) — double sortie HTML + JSON — status: generating-plan → plan-ready |
-| `src/lib/guide/article-generator.ts` | Distribution mots-clés + génération fiches (template DB `prompt_generation`) + résumé + enrichissements + assemblage — status: distributing → generating → summarizing → enriching → complete |
-| `src/lib/guide/enrichment-step.ts` | Enrichissement article : résumé, chapô+intro, sommaire, critères sélection, FAQ, méta — 5 appels parallèles via `Promise.allSettled`. Helpers `loadForbiddenWords()` + `formatForbiddenWords()` pour charger les mots interdits depuis AppConfig. `loadPrompt()` charge depuis DB uniquement (erreur si manquant) |
-| `src/lib/guide/humanize-step.ts` | Humanisation article V1 → V2 via prompt `prompt_humaniser` (DB uniquement) — status: humanizing → complete |
+| `src/lib/guide/plan-generator.ts` | Génération du plan IA (modèle `model_generation`) — double sortie HTML + JSON — status: generating-plan → plan-ready |
+| `src/lib/guide/article-generator.ts` | Génération fiches (template DB `prompt_generation`, nb mots depuis `planJson.mots_total`) + résumé + enrichissements + assemblage + post-traitement bold — status: generating → summarizing → enriching → complete |
+| `src/lib/guide/enrichment-step.ts` | Enrichissement article : résumé, chapô+intro, sommaire, critères sélection, FAQ, méta — 5 appels parallèles. Helpers `loadForbiddenWords()` + `formatForbiddenWords()` + `stripBoldFromBody()`. Extraction sections depuis JSON uniquement (plus de fallback HTML) |
+| `src/lib/guide/humanize-step.ts` | Humanisation article V1 → V2 via prompt `prompt_humaniser` (modèle `model_humanization`) + post-traitement bold — status: humanizing → complete |
 | `src/lib/prompt-builder/index.ts` | (legacy) Ancien prompt builder hardcodé — **plus utilisé par le pipeline**, remplacé par le template DB `prompt_generation` |
 | `src/lib/prompt-builder/annotated.ts` | Construit un prompt annoté depuis un template (placeholders → segments avec badges) pour le Playground |
 | `src/lib/intelligence/review-analyzer.ts` | Analyse IA des avis — charge le prompt depuis AppConfig (`prompt_analysis`, DB uniquement, erreur si manquant), placeholders : `{title}`, `{brand}`, `{price}`, `{rating}`, `{reviewCount}`, `{description}`, `{features}`, `{count}`, `{reviews}` |
@@ -155,10 +155,8 @@ Générateur de guides d'achat SEO avec fiches produits Amazon.
 ### Clés AppConfig importantes
 | Clé | Contenu |
 |-----|---------|
-| `model_generation` | Modèle IA pour la génération de fiches (ex: `gpt-5.4`, `claude-sonnet-4-20250514`) |
-| `model_analysis` | Modèle IA pour l'analyse des avis |
-| `model_plan` | Modèle IA pour la génération du plan |
-| `openai_model` | (legacy) Fallback si les modèles par étape ne sont pas configurés |
+| `model_generation` | Modèle IA pour tout le pipeline V1 : analyse, plan, fiches, enrichissements (ex: `gpt-5.4`, `claude-sonnet-4-20250514`) |
+| `model_humanization` | Modèle IA pour l'humanisation V2 uniquement (fallback sur `model_generation` si non configuré) |
 | `prompt_generation` | Prompt template pour générer les fiches produits — **utilisé par le pipeline ET le Playground** — placeholders : `{media.name}`, `{media.toneDescription}`, `{media.writingStyle}`, `{doRules}`, `{dontRules}`, `{forbiddenWords}`, `{intelligence.productTitle}`, `{intelligence.shortTitle}`, `{intelligence.productBrand}`, `{intelligence.productPrice}`, `{intelligence.asin}`, `{intelligence.positioningSummary}`, `{intelligence.keyFeatures}`, `{intelligence.detectedUsages}`, `{intelligence.buyerProfiles}`, `{intelligence.strengthPoints}`, `{intelligence.weaknessPoints}`, `{intelligence.recurringProblems}`, `{intelligence.remarkableQuotes}`, `{keyword}`, `{keywords}`, `{wordCount}`, `{planSection}` |
 | `prompt_analysis` | Prompt template pour analyser les avis — placeholders : `{title}`, `{brand}`, `{price}`, `{rating}`, `{reviewCount}`, `{description}`, `{features}`, `{count}`, `{reviews}`. Sections `**System**` et `**User**` détectées automatiquement |
 | `prompt_criteres` | Prompt Perplexity pour générer les critères (placeholder `#MotClesprincipal`) |
@@ -303,7 +301,7 @@ Au submit du formulaire de création :
 | `/produits` | Produits scrappés |
 | `/intelligence` | Analyses IA structurées |
 | `/playground` | Playground : sélecteur guide → produit → prompt résolu complet → génération V1 → humanisation V2 |
-| `/parametres` | Config runtime : 3 onglets — Prompts (Critères Perplexity, Analyse, Generation, Résumé, Chapô+Intro, Sommaire, Critères sélection, FAQ, Méta+Slug, Humaniser, Interdits lexicaux + modèle IA par étape), Clés API, Doc |
+| `/parametres` | Config runtime : 3 onglets — Prompts (11 sous-onglets dont Interdits lexicaux), Clés API (2 sélecteurs modèle IA + 4 clés API), Doc |
 
 ---
 
@@ -381,11 +379,9 @@ Le prompt est résolu dans cet ordre de priorité :
 1. `media.promptPlan` (champ sur le média, éditable dans `/medias/[id]`)
 2. `DEFAULT_PLAN_PROMPT` (hardcodé dans `plan-generator.ts`)
 
-Le modèle IA est résolu dans cet ordre de priorité :
-1. `media.modelPlan` (sélecteur sur le média, éditable dans `/medias/[id]`)
-2. Config globale `model_plan` (AppConfig, éditable dans `/parametres`)
+Le modèle IA utilisé est `model_generation` (configuré dans Paramètres > Clés API).
 
-Note : le prompt plan n'est plus dans Paramètres (AppConfig `prompt_plan` supprimé de l'UI). Chaque média a son propre prompt plan, structure de sortie et modèle IA.
+Note : le prompt plan n'est plus dans Paramètres. Chaque média a son propre prompt plan et structure de sortie.
 
 Le prompt final envoyé à l'IA = `promptPlan` + `planOutputStructure` (concaténés par le code).
 
@@ -451,12 +447,10 @@ Le prompt est un **template éditable** dans Paramètres > Analyse (clé `prompt
 | `writingStyle` | `{media.writingStyle}` | Style d'écriture |
 | `doRules` | `{doRules}` | Règles à suivre (JSON array, une par ligne) |
 | `dontRules` | `{dontRules}` | Règles à éviter (JSON array, une par ligne) |
-| `defaultProductWordCount` | — | Nombre de mots par fiche produit |
 | `promptPlan` | — | Prompt plan spécifique au média (placeholders `#NomMedia`, etc.). Nommage aligné sur les clés JSON : `mots_cles`, `nombre_mots`, `mots_total`, `(JSON: "clé")` |
 | `planOutputStructure` | — | Structure de sortie du plan (format HTML + JSON). Concaténé après le prompt plan. |
-| `modelPlan` | — | Modèle IA pour la génération du plan (vide = config globale Paramètres) |
 
-Champs **retirés de l'UI média** (restent en DB) : `productStructureTemplate`, `forbiddenWords`
+Champs **retirés de l'UI média** (restent en DB) : `productStructureTemplate`, `forbiddenWords`, `defaultProductWordCount`, `modelPlan`
 
 **Badges** : chaque champ du formulaire média affiche un badge `{placeholder}` à côté du label pour indiquer la variable à utiliser dans les prompts.
 
@@ -584,3 +578,9 @@ Champs **retirés de l'UI média** (restent en DB) : `productStructureTemplate`,
 | 2026-03-25 | Section "Critères de sélection" ajoutée au pipeline article — prompt `prompt_criteres_selection`, champ `criteresHtml`, 5ème appel parallèle |
 | 2026-03-25 | Assemblage article : chapô + sommaire + **critères** + fiches + FAQ (critères insérés entre sommaire et fiches) |
 | 2026-03-25 | Sous-onglet "Critères sélection" ajouté dans Paramètres > Prompts (clé `prompt_criteres_selection`) |
+| 2026-03-25 | `defaultProductWordCount` retiré de l'UI média — nb mots par fiche piloté par `mots_total` du plan JSON (fallback 250) |
+| 2026-03-25 | Post-traitement `stripBoldFromBody()` : supprime le gras du corps de texte, conserve uniquement dans les headings et le chapô (V1 + V2) |
+| 2026-03-25 | Suppression de tous les fallbacks HTML — extraction des sections uniquement depuis le plan JSON |
+| 2026-03-25 | Simplification modèles IA : 2 sélecteurs dans Paramètres > Clés API — "Modèle Article (V1)" (`model_generation`) et "Modèle Humanisation (V2)" (`model_humanization`) |
+| 2026-03-25 | Suppression sélecteurs modèle par prompt (Paramètres > Prompts) et sélecteur `modelPlan` du formulaire média |
+| 2026-03-25 | Clés `model_analysis`, `model_plan`, `openai_model` supprimées — tout le pipeline V1 utilise `model_generation` |
