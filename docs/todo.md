@@ -11,7 +11,7 @@
 - [ ] **Plan** : une fois le plan généré, afficher un bouton "Passer à l'article" qui passe à l'onglet Article
 - [ ] **Score SEO par étape** : calculer et stocker un score Serpmantics séparé pour le plan, l'article V1 et l'article V2. A chaque génération, pousser automatiquement le contenu dans Serpmantics et mettre à jour uniquement le score de la partie concernée (pas les autres)
 - [x] **Plan structuré JSON** : générer un JSON structuré en plus du HTML pour fiabiliser l'extraction des sections — implémenté le 2026-03-25
-- [ ] **Article — Critères de sélection** : ajouter la section "Critères de sélection" dans l'article (nouveau prompt `prompt_criteres_selection`, nouveau champ DB `criteresHtml`, intégré dans l'assemblage entre sommaire et fiches produits)
+- [x] **Article — Critères de sélection** : ajouter la section "Critères de sélection" dans l'article (nouveau prompt `prompt_criteres_selection`, nouveau champ DB `criteresHtml`, intégré dans l'assemblage entre sommaire et fiches produits) — implémenté le 2026-03-25
 - [ ] **Article — Titre FAQ** : le prompt FAQ doit générer un titre H2 éditorialisé (avec le mot-clé principal) avant les questions
 - [ ] **Optimisation coûts** : utiliser un modèle moins cher (Claude Haiku 4) pour l'analyse des avis (extraction de données, pas de rédaction créative) — ~10x moins cher pour un résultat comparable
 - [ ] **Distribution mots-clés** : actuellement commentée — les mots-clés sont gérés par le plan via `{planSection}`. Réactiver si le score SEO Serpmantics est insuffisant

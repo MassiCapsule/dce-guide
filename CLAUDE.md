@@ -48,7 +48,7 @@ Générateur de guides d'achat SEO avec fiches produits Amazon.
 | Fichier | Rôle |
 |---------|------|
 | `src/components/guides/guide-form.tsx` | Formulaire création guides (keyword + media uniquement) — sans critères, sans ASINs |
-| `src/app/parametres/page.tsx` | Page config : 3 onglets (Prompts, Clés API, Doc). 9 sous-onglets prompts. Doc affiche le README |
+| `src/app/parametres/page.tsx` | Page config : 3 onglets (Prompts, Clés API, Doc). 11 sous-onglets prompts (dont Critères sélection + Interdits lexicaux). Doc affiche le README |
 | `src/app/playground/page.tsx` | Playground : sélecteur guide → produit → prompt résolu complet → génération → humanisation V2 |
 | `src/components/editor/rich-editor.tsx` | Éditeur WYSIWYG TipTap v3 (H1/H2/H3, gras, listes, tableau, bouton copier formaté) |
 | `src/components/editor/seo-score-bar.tsx` | Barre score SEO Serpmantics + pills mots-clés |
@@ -104,7 +104,7 @@ Générateur de guides d'achat SEO avec fiches produits Amazon.
 | `src/lib/guide/plan-types.ts` | Types TypeScript pour le plan JSON structuré + helper `parsePlanJson()` |
 | `src/lib/guide/plan-generator.ts` | Génération du plan IA (modèle `model_plan`) — double sortie HTML + JSON — status: generating-plan → plan-ready |
 | `src/lib/guide/article-generator.ts` | Distribution mots-clés + génération fiches (template DB `prompt_generation`) + résumé + enrichissements + assemblage — status: distributing → generating → summarizing → enriching → complete |
-| `src/lib/guide/enrichment-step.ts` | Enrichissement article : résumé, chapô+intro, sommaire, FAQ, méta — 4 appels parallèles via `Promise.allSettled`. Extrait les sections du plan (`::: Nom :::`) pour les injecter via `{planSection}`. `loadPrompt()` charge depuis DB uniquement (erreur si manquant) |
+| `src/lib/guide/enrichment-step.ts` | Enrichissement article : résumé, chapô+intro, sommaire, critères sélection, FAQ, méta — 5 appels parallèles via `Promise.allSettled`. Helpers `loadForbiddenWords()` + `formatForbiddenWords()` pour charger les mots interdits depuis AppConfig. `loadPrompt()` charge depuis DB uniquement (erreur si manquant) |
 | `src/lib/guide/humanize-step.ts` | Humanisation article V1 → V2 via prompt `prompt_humaniser` (DB uniquement) — status: humanizing → complete |
 | `src/lib/prompt-builder/index.ts` | (legacy) Ancien prompt builder hardcodé — **plus utilisé par le pipeline**, remplacé par le template DB `prompt_generation` |
 | `src/lib/prompt-builder/annotated.ts` | Construit un prompt annoté depuis un template (placeholders → segments avec badges) pour le Playground |
@@ -134,11 +134,12 @@ Générateur de guides d'achat SEO avec fiches produits Amazon.
 | `seoKeywords` | Mots-clés SEO avec occurrences (JSON string, persisté en DB) |
 | `planHtml` | Plan d'article généré par IA (HTML pour l'éditeur TipTap) |
 | `planJson` | Plan d'article en JSON structuré (pour l'extraction fiable des sections) |
-| `guideHtml` | Article complet assemblé par IA (chapô + sommaire + fiches + FAQ) |
+| `guideHtml` | Article complet assemblé par IA (chapô + sommaire + critères + fiches + FAQ) |
 | `guideHtmlV2` | Article humanisé par IA (V2) |
 | `articleSummary` | Résumé de l'article (~200 mots, utilisé pour générer les éléments complémentaires) |
 | `chapoHtml` | Chapô (30 mots) + Introduction (100 mots) |
 | `sommaireHtml` | Sommaire / sélection produits |
+| `criteresHtml` | Section critères de sélection (entre sommaire et fiches produits) |
 | `faqHtml` | FAQ 5 questions |
 | `metaTitle` | Meta title généré par IA (éditable dans Éléments SEO) |
 | `metaDescription` | Meta description générée par IA (éditable dans Éléments SEO) |
@@ -150,7 +151,6 @@ Générateur de guides d'achat SEO avec fiches produits Amazon.
 |-------|------|
 | `description` | Description courte du média (affichée dans le formulaire) |
 | `promptPlan` | Prompt de plan spécifique à ce média. Vide = utilise `DEFAULT_PLAN_PROMPT` hardcodé. |
-| `forbiddenWords` | Interdits lexicaux (JSON string array) — mots/expressions à ne jamais utiliser dans les contenus générés |
 
 ### Clés AppConfig importantes
 | Clé | Contenu |
@@ -166,8 +166,10 @@ Générateur de guides d'achat SEO avec fiches produits Amazon.
 | `prompt_resume` | Prompt pour résumer l'article — placeholder : `{article}` |
 | `prompt_chapo` | Prompt chapô (30 mots) + introduction (100 mots) — placeholders : `{media.name}`, `{media.toneDescription}`, `{media.writingStyle}`, `{forbiddenWords}`, `{keyword}`, `{resume}`, `{planSection}` (= sections `::: Chapô :::` + `::: Introduction :::` du plan) |
 | `prompt_sommaire` | Prompt sommaire / sélection produits — mêmes placeholders + `{planSection}` (= section `::: Critères de sélection :::` du plan) |
+| `prompt_criteres_selection` | Prompt critères de sélection — mêmes placeholders + `{planSection}` (= section critères du plan) |
 | `prompt_faq` | Prompt FAQ 5 questions — mêmes placeholders + `{planSection}` (= section `::: FAQ :::` du plan) |
 | `prompt_meta` | Prompt meta title + meta description + légende + slug — mêmes placeholders (sans `{planSection}`) |
+| `forbidden_words` | Interdits lexicaux (JSON string array) — mots/expressions à ne jamais utiliser. Placeholder `{forbiddenWords}` dans les prompts |
 | `openai_api_key` | Clé API OpenAI (saisie depuis /parametres > Clés API) |
 | `anthropic_api_key` | Clé API Anthropic (saisie depuis /parametres > Clés API) |
 | `apify_api_token` | Clé API Apify (saisie depuis /parametres > Clés API) |
@@ -217,8 +219,8 @@ La création d'un guide se fait en 6 étapes enchaînées naturellement :
   1. Distribution mots-clés (status: distributing)
   2. Génération fiche par produit (status: generating, currentStep 1/N)
   3. Résumé de l'article (status: summarizing) — ~200 mots, sauvé dans `articleSummary`
-  4. 4 appels parallèles (status: enriching) : chapô+intro, sommaire, FAQ, méta+slug
-  5. Assemblage final : chapô + sommaire + fiches + FAQ → `guideHtml`
+  4. 5 appels parallèles (status: enriching) : chapô+intro, sommaire, critères sélection, FAQ, méta+slug
+  5. Assemblage final : chapô + sommaire + critères + fiches + FAQ → `guideHtml`
 - MetaFields (slug, meta title, meta description, légende) pré-remplis automatiquement par l'IA
 - Résultat dans `guide.guideHtml` → affiché dans RichEditor (éditable)
 
@@ -301,7 +303,7 @@ Au submit du formulaire de création :
 | `/produits` | Produits scrappés |
 | `/intelligence` | Analyses IA structurées |
 | `/playground` | Playground : sélecteur guide → produit → prompt résolu complet → génération V1 → humanisation V2 |
-| `/parametres` | Config runtime : 2 onglets — Prompts (Critères Perplexity, Analyse, Generation, Résumé, Chapô+Intro, Sommaire, FAQ, Méta+Slug, Humaniser + modèle IA par étape) et Clés API (OpenAI, Anthropic, Apify, Serpmantics) |
+| `/parametres` | Config runtime : 3 onglets — Prompts (Critères Perplexity, Analyse, Generation, Résumé, Chapô+Intro, Sommaire, Critères sélection, FAQ, Méta+Slug, Humaniser, Interdits lexicaux + modèle IA par étape), Clés API, Doc |
 
 ---
 
@@ -449,13 +451,12 @@ Le prompt est un **template éditable** dans Paramètres > Analyse (clé `prompt
 | `writingStyle` | `{media.writingStyle}` | Style d'écriture |
 | `doRules` | `{doRules}` | Règles à suivre (JSON array, une par ligne) |
 | `dontRules` | `{dontRules}` | Règles à éviter (JSON array, une par ligne) |
-| `forbiddenWords` | `{forbiddenWords}` | Interdits lexicaux (JSON array, un par ligne) |
 | `defaultProductWordCount` | — | Nombre de mots par fiche produit |
 | `promptPlan` | — | Prompt plan spécifique au média (placeholders `#NomMedia`, etc.). Nommage aligné sur les clés JSON : `mots_cles`, `nombre_mots`, `mots_total`, `(JSON: "clé")` |
 | `planOutputStructure` | — | Structure de sortie du plan (format HTML + JSON). Concaténé après le prompt plan. |
 | `modelPlan` | — | Modèle IA pour la génération du plan (vide = config globale Paramètres) |
 
-Champs **retirés de l'UI média** (restent en DB) : `productStructureTemplate`
+Champs **retirés de l'UI média** (restent en DB) : `productStructureTemplate`, `forbiddenWords`
 
 **Badges** : chaque champ du formulaire média affiche un badge `{placeholder}` à côté du label pour indiquer la variable à utiliser dans les prompts.
 
@@ -577,3 +578,9 @@ Champs **retirés de l'UI média** (restent en DB) : `productStructureTemplate`
 | 2026-03-20 | API `POST /api/playground/resolve-prompt` — résout le template prompt_generation avec les vraies données guide + produit |
 | 2026-03-20 | Distribution mots-clés désactivée (commentée) — mots-clés gérés par le plan via `{planSection}` |
 | 2026-03-20 | Matching plan↔produit amélioré : comparaison par mots significatifs + nom de marque (>5 chars), supporte titres Amazon anglais vs plan français |
+| 2026-03-25 | `forbiddenWords` déplacé du média vers AppConfig (clé `forbidden_words`) — sous-onglet "Interdits lexicaux" dans Paramètres > Prompts |
+| 2026-03-25 | Helpers `loadForbiddenWords()` + `formatForbiddenWords()` dans enrichment-step.ts — centralisent le chargement depuis AppConfig |
+| 2026-03-25 | Champ `forbiddenWords` retiré du formulaire média (reste en DB) |
+| 2026-03-25 | Section "Critères de sélection" ajoutée au pipeline article — prompt `prompt_criteres_selection`, champ `criteresHtml`, 5ème appel parallèle |
+| 2026-03-25 | Assemblage article : chapô + sommaire + **critères** + fiches + FAQ (critères insérés entre sommaire et fiches) |
+| 2026-03-25 | Sous-onglet "Critères sélection" ajouté dans Paramètres > Prompts (clé `prompt_criteres_selection`) |
