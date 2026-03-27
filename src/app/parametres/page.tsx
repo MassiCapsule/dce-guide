@@ -30,10 +30,11 @@ const MODELS = [
 const OPENAI_MODELS = MODELS.filter((m) => m.provider === "OpenAI");
 const ANTHROPIC_MODELS = MODELS.filter((m) => m.provider === "Anthropic");
 
-type PromptKey = "generation" | "analysis" | "criteres" | "humaniser" | "resume" | "chapo" | "sommaire" | "criteres_selection" | "faq" | "meta" | "forbidden_words" | "postprod";
+type PromptKey = "generation" | "analysis" | "criteres" | "criteres_auto" | "humaniser" | "resume" | "chapo" | "sommaire" | "criteres_selection" | "faq" | "meta" | "forbidden_words" | "postprod";
 
 const PROMPT_TABS: { key: PromptKey; label: string }[] = [
   { key: "criteres", label: "Criteres Perplexity" },
+  { key: "criteres_auto", label: "Criteres auto (IA)" },
   { key: "analysis", label: "Analyse" },
   { key: "generation", label: "Generation" },
   { key: "resume", label: "Resume" },
@@ -88,6 +89,7 @@ export default function ParametresPage() {
   const [faqPrompt, setFaqPrompt] = useState("");
   const [metaPrompt, setMetaPrompt] = useState("");
   const [forbiddenWordsText, setForbiddenWordsText] = useState("");
+  const [criteresAutoPrompt, setCriteresAutoPrompt] = useState("");
   const [promptTab, setPromptTab] = useState<PromptKey>("criteres");
   const [promptSaved, setPromptSaved] = useState(false);
   const [readmeContent, setReadmeContent] = useState<string>("");
@@ -115,6 +117,7 @@ export default function ParametresPage() {
         if (data.prompt_generation) setGenerationPrompt(data.prompt_generation);
         if (data.prompt_analysis) setAnalysisPrompt(data.prompt_analysis);
         if (data.prompt_criteres) setCriteresPrompt(data.prompt_criteres);
+        if (data.prompt_criteres_auto) setCriteresAutoPrompt(data.prompt_criteres_auto);
         if (data.prompt_humaniser) setHumaniserPrompt(data.prompt_humaniser);
         if (data.prompt_resume) setResumePrompt(data.prompt_resume);
         if (data.prompt_chapo) setChapoPrompt(data.prompt_chapo);
@@ -140,6 +143,7 @@ export default function ParametresPage() {
         setGenerationPrompt((prev) => prev || defaults.generation);
         setAnalysisPrompt((prev) => prev || defaults.analysis);
         setCriteresPrompt((prev) => prev || defaults.criteres);
+        setCriteresAutoPrompt((prev) => prev || defaults.criteres_auto);
         setHumaniserPrompt((prev) => prev || defaults.humaniser);
         setResumePrompt((prev) => prev || defaults.resume);
         setChapoPrompt((prev) => prev || defaults.chapo);
@@ -189,6 +193,11 @@ export default function ParametresPage() {
       fetch("/api/config", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ key: "prompt_criteres_auto", value: criteresAutoPrompt }),
+      }),
+      fetch("/api/config", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ key: "prompt_humaniser", value: humaniserPrompt }),
       }),
       fetch("/api/config", {
@@ -234,7 +243,7 @@ export default function ParametresPage() {
     ]);
     setPromptSaved(true);
     setTimeout(() => setPromptSaved(false), 2000);
-  }, [generationPrompt, analysisPrompt, criteresPrompt, humaniserPrompt, resumePrompt, chapoPrompt, sommairePrompt, criteresSelectionPrompt, faqPrompt, metaPrompt, forbiddenWordsText]);
+  }, [generationPrompt, analysisPrompt, criteresPrompt, criteresAutoPrompt, humaniserPrompt, resumePrompt, chapoPrompt, sommairePrompt, criteresSelectionPrompt, faqPrompt, metaPrompt, forbiddenWordsText]);
 
   const saveApiKey = async (configKey: string, value: string, setSaved: (v: boolean) => void) => {
     await fetch("/api/config", {
@@ -257,6 +266,7 @@ export default function ParametresPage() {
     if (tab === "criteres_selection") return criteresSelectionPrompt;
     if (tab === "faq") return faqPrompt;
     if (tab === "meta") return metaPrompt;
+    if (tab === "criteres_auto") return criteresAutoPrompt;
     if (tab === "forbidden_words") return forbiddenWordsText;
     return criteresPrompt;
   };
@@ -265,6 +275,7 @@ export default function ParametresPage() {
     if (tab === "generation") setGenerationPrompt(value);
     else if (tab === "analysis") setAnalysisPrompt(value);
     else if (tab === "criteres") setCriteresPrompt(value);
+    else if (tab === "criteres_auto") setCriteresAutoPrompt(value);
     else if (tab === "humaniser") setHumaniserPrompt(value);
     else if (tab === "resume") setResumePrompt(value);
     else if (tab === "chapo") setChapoPrompt(value);

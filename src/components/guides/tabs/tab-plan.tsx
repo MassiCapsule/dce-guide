@@ -34,6 +34,7 @@ export function TabPlan({ guideId, initialHtml, initialCriteria, keyword, seoSco
   const [html, setHtml] = useState<string>(initialHtml);
   const [criteria, setCriteria] = useState<string>(initialCriteria);
   const [criteresPrompt, setCriteresPrompt] = useState<string>("");
+  const [generatingCriteria, setGeneratingCriteria] = useState(false);
   const [savingCriteria, setSavingCriteria] = useState(false);
   const [validating, setValidating] = useState(false);
   const [score, setScore] = useState<number | null>(seoScore);
@@ -86,6 +87,25 @@ export function TabPlan({ guideId, initialHtml, initialCriteria, keyword, seoSco
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
+  };
+
+  const handleGenererCriteresAuto = async () => {
+    setCriteria("");
+    setGeneratingCriteria(true);
+    try {
+      const res = await fetch(`/api/guides/${guideId}/criteres-auto`, { method: "POST" });
+      const data = await res.json();
+      if (res.ok) {
+        setCriteria(data.criteria);
+        await onSaveCriteria(data.criteria);
+      } else {
+        setCriteria(`Erreur : ${data.error || "Échec de la génération"}`);
+      }
+    } catch (err) {
+      setCriteria(`Erreur réseau : ${err instanceof Error ? err.message : "inconnue"}`);
+    } finally {
+      setGeneratingCriteria(false);
+    }
   };
 
   function stopPolling() {
@@ -196,15 +216,31 @@ export function TabPlan({ guideId, initialHtml, initialCriteria, keyword, seoSco
           <div>
             <div className="flex items-center justify-between mb-1">
               <Label htmlFor="criteria">Critères</Label>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={handleGenererCriteres}
-              >
-                <ExternalLink className="mr-2 h-3 w-3" />
-                Générer via Perplexity
-              </Button>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleGenererCriteresAuto}
+                  disabled={generatingCriteria}
+                >
+                  {generatingCriteria ? (
+                    <Loader2 className="mr-2 h-3 w-3 animate-spin" />
+                  ) : (
+                    <Sparkles className="mr-2 h-3 w-3" />
+                  )}
+                  {generatingCriteria ? "Génération…" : "Générer (IA)"}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleGenererCriteres}
+                >
+                  <ExternalLink className="mr-2 h-3 w-3" />
+                  Perplexity
+                </Button>
+              </div>
             </div>
             <textarea
               id="criteria"

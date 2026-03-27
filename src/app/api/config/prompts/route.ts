@@ -331,13 +331,31 @@ Mot-clé principal : {keyword}
 Résumé de l'article :
 {resume}`;
 
-export { HUMANISER_PROMPT, RESUME_PROMPT, CHAPO_PROMPT, SOMMAIRE_PROMPT, CRITERES_SELECTION_PROMPT, FAQ_PROMPT, META_PROMPT };
+const CRITERES_AUTO_PROMPT = `Tu es un expert en guides d'achat.
+Je rédige un guide d'achat sur : {keyword}
+Liste les 5 critères les plus importants pour bien choisir ce produit, hormis le prix.
+
+> Règles strictes :
+- Exactement 5 critères, pas plus, pas moins
+- Chaque critère a un nom court et une explication concrète (max 20 mots)
+- Réponse en JSON uniquement, sans texte avant ni après
+- Format :
+[
+  { "critere": "Nom du critère", "explication": "Explication courte et concrète" },
+  { "critere": "Nom du critère", "explication": "Explication courte et concrète" },
+  { "critere": "Nom du critère", "explication": "Explication courte et concrète" },
+  { "critere": "Nom du critère", "explication": "Explication courte et concrète" },
+  { "critere": "Nom du critère", "explication": "Explication courte et concrète" }
+]`;
+
+export { HUMANISER_PROMPT, RESUME_PROMPT, CHAPO_PROMPT, SOMMAIRE_PROMPT, CRITERES_SELECTION_PROMPT, FAQ_PROMPT, META_PROMPT, CRITERES_AUTO_PROMPT };
 
 export async function GET() {
   return NextResponse.json({
     analysis: ANALYSIS_PROMPT,
     generation: GENERATION_PROMPT,
     criteres: CRITERES_PROMPT,
+    criteres_auto: CRITERES_AUTO_PROMPT,
     humaniser: HUMANISER_PROMPT,
     plan: DEFAULT_PLAN_PROMPT,
     resume: RESUME_PROMPT,
