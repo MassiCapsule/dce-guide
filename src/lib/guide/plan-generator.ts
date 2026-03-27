@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { chatCompletion } from "@/lib/ai-client";
 import { getConfigModel } from "@/lib/config";
 import { calculateCost } from "@/lib/pricing";
+import { formatForbiddenWords, loadForbiddenWords } from "./enrichment-step";
 
 export const DEFAULT_PLAN_PROMPT = `// Rôle
 Vous êtes un expert en architecture éditoriale pour guides d'achat grand public, spécialisé dans la création de plans d'articles structurés pour #NomMedia. Votre expertise réside dans la conception de trames éditoriales claires, reproductibles et immédiatement exploitables par des journalistes, fondées sur le modèle marketing SAVE (Situation, Atout, Valeur, Évidence), sans rédaction finale.
@@ -128,9 +129,13 @@ export async function generatePlan(guideId: string): Promise<void> {
     if (!guide) throw new Error("Guide introuvable");
 
     const model = await getConfigModel("generation");
+    const forbiddenWords = await loadForbiddenWords();
 
-    // Priorité : prompt du média > défaut
-    const promptTemplate = guide.media?.promptPlan?.trim() || DEFAULT_PLAN_PROMPT;
+    // Prompt plan obligatoirement sur le média
+    const promptTemplate = guide.media?.promptPlan?.trim();
+    if (!promptTemplate) {
+      throw new Error("Prompt plan manquant sur le média. Configurez-le dans /medias.");
+    }
 
     // Build product summaries
     const resumeProduits = guide.products
@@ -161,7 +166,8 @@ export async function generatePlan(guideId: string): Promise<void> {
       .replace(/#NombreMots/g, String(avgWordCount))
       .replace(/#Criteres/g, guide.criteria || "Aucun critère spécifié")
       .replace(/#ResumeProduits/g, resumeProduits || "Aucun produit")
-      .replace(/#MotsCles/g, motsCles || "Aucun mot-clé");
+      .replace(/#MotsCles/g, motsCles || "Aucun mot-clé")
+      .replace(/\{forbiddenWords\}/g, formatForbiddenWords(forbiddenWords));
 
     // Structure de sortie : depuis le média, sinon vide (pas de format imposé)
     const outputStructure = guide.media?.planOutputStructure?.trim() || "";

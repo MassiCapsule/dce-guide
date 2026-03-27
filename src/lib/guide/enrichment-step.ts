@@ -10,6 +10,7 @@ import { parsePlanJson } from "./plan-types";
 
 const bullet = (s: string) => (s.startsWith("- ") ? s : `- ${s}`);
 
+
 /**
  * Supprime les balises <strong> de tout le HTML SAUF dans les headings (h1-h6)
  * et le chapô (<p class="chapo">).
@@ -251,6 +252,7 @@ export async function loadForbiddenWords(): Promise<string[]> {
 export function formatForbiddenWords(words: string[]): string {
   return words.length > 0 ? words.map(bullet).join("\n") : "(aucun)";
 }
+
 
 export function resolveMediaPlaceholders(
   prompt: string,
