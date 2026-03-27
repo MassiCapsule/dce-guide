@@ -48,7 +48,7 @@ Générateur de guides d'achat SEO avec fiches produits Amazon.
 | Fichier | Rôle |
 |---------|------|
 | `src/components/guides/guide-form.tsx` | Formulaire création guides (keyword + media uniquement) — sans critères, sans ASINs |
-| `src/app/parametres/page.tsx` | Page config : 3 onglets (Prompts, Clés API, Doc). 12 sous-onglets prompts (dont Critères sélection, Interdits lexicaux, Post-traitement en lecture seule). Doc affiche le README |
+| `src/app/parametres/page.tsx` | Page config : 3 onglets (Prompts, Clés API, Doc). 13 sous-onglets prompts (dont Critères auto IA, Critères sélection, Interdits lexicaux, Post-traitement en lecture seule). Doc affiche le README |
 | `src/app/playground/page.tsx` | Playground : sélecteur guide → produit → prompt résolu complet → génération → humanisation V2 |
 | `src/components/editor/rich-editor.tsx` | Éditeur WYSIWYG TipTap v3 (H1/H2/H3, gras, listes, tableau, bouton copier formaté) |
 | `src/components/editor/seo-score-bar.tsx` | Barre score SEO Serpmantics + pills mots-clés |
@@ -56,9 +56,8 @@ Générateur de guides d'achat SEO avec fiches produits Amazon.
 | `src/components/guides/tabs/tab-overview.tsx` | Onglet Vue d'ensemble : infos guide, mots-clés collapsible, bouton "Ajouter des produits", progression |
 | `src/components/guides/tabs/tab-products.tsx` | Onglet Produits : ajout ASIN, bouton sticky "Lancer la récupération" + barre de progression (scraping/analyse), suppression avec confirmation |
 | `src/components/intelligence/intelligence-list.tsx` | Liste produits intelligence avec suppression + confirmation |
-| `src/components/guides/tabs/tab-plan.tsx` | Onglet Plan : critères éditables + bouton Perplexity + bouton sticky "Générer le plan (IA)" + barre de progression + polling + RichEditor |
-| `src/components/guides/tabs/tab-article.tsx` | Onglet Article : bouton sticky "Générer l'article (IA)" + bouton "Intro + FAQ" + collapsible "Titre H1" (propositions IA) + collapsible "Éléments SEO" + RichEditor |
-| `src/components/guides/tabs/tab-article-v2.tsx` | Onglet Article V2 : bouton sticky "Humaniser" + bouton "Intro + FAQ" (cible V2) + collapsible "Titre H1" + collapsible "Éléments SEO" + RichEditor |
+| `src/components/guides/tabs/tab-plan.tsx` | Onglet Plan : critères éditables + bouton "Générer (IA)" (auto-génération critères) + bouton Perplexity + bouton sticky "Générer le plan (IA)" + barre de progression + polling + RichEditor |
+| `src/components/guides/tabs/tab-article-v2.tsx` | Onglet Article : bouton "Générer l'article" (enchaîne V1→V2 automatiquement) + bouton "Humaniser" (ré-humanise V1 existant) + bouton "Intro + FAQ" + collapsible "Titre H1" + collapsible "Éléments SEO" + collapsible "Article V1 (original)" + RichEditor |
 | `src/app/guides/[id]/page.tsx` | Page guide : charge vraies données API, passe guideId + onRefresh à chaque tab, suppression guide avec confirmation |
 
 ### API Routes
@@ -77,6 +76,7 @@ Générateur de guides d'achat SEO avec fiches produits Amazon.
 | `/api/guides/[id]/article` | POST | Lancer génération de l'article V1 en arrière-plan |
 | `/api/guides/[id]/humanize` | POST | Lancer humanisation de l'article (V1 → V2) en arrière-plan |
 | `/api/guides/[id]/regenerate-intro-faq` | POST | Relancer chapô+intro et FAQ — body `{ target: "v1" }` ou `{ target: "v2" }`. V1 ré-assemble l'article complet, V2 remplace les sections dans guideHtmlV2 |
+| `/api/guides/[id]/criteres-auto` | POST | Générer les critères d'achat via IA (prompt `prompt_criteres_auto`) et sauvegarder sur le guide |
 | `/api/guides/[id]/score` | POST | Calculer le score SEO Serpmantics sur un contenu HTML |
 | `/api/guides/[id]/status` | GET | Statut du pipeline (status, currentStep, errorMessage) |
 | `/api/guides/[id]/generate` | POST | (legacy) Pipeline complet monolithique |
@@ -152,7 +152,7 @@ Générateur de guides d'achat SEO avec fiches produits Amazon.
 | Champ | Rôle |
 |-------|------|
 | `description` | Description courte du média (affichée dans le formulaire) |
-| `promptPlan` | Prompt de plan spécifique à ce média. Vide = utilise `DEFAULT_PLAN_PROMPT` hardcodé. |
+| `promptPlan` | Prompt de plan spécifique à ce média. **Obligatoire** — erreur si vide. |
 
 ### Clés AppConfig importantes
 | Clé | Contenu |
@@ -162,6 +162,7 @@ Générateur de guides d'achat SEO avec fiches produits Amazon.
 | `prompt_generation` | Prompt template pour générer les fiches produits — **utilisé par le pipeline ET le Playground** — placeholders : `{media.name}`, `{media.toneDescription}`, `{media.writingStyle}`, `{doRules}`, `{dontRules}`, `{forbiddenWords}`, `{intelligence.productTitle}`, `{intelligence.shortTitle}`, `{intelligence.productBrand}`, `{intelligence.productPrice}`, `{intelligence.asin}`, `{intelligence.positioningSummary}`, `{intelligence.keyFeatures}`, `{intelligence.detectedUsages}`, `{intelligence.buyerProfiles}`, `{intelligence.strengthPoints}`, `{intelligence.weaknessPoints}`, `{intelligence.recurringProblems}`, `{intelligence.remarkableQuotes}`, `{keyword}`, `{keywords}`, `{wordCount}`, `{planSection}` |
 | `prompt_analysis` | Prompt template pour analyser les avis — placeholders : `{title}`, `{brand}`, `{price}`, `{rating}`, `{reviewCount}`, `{description}`, `{features}`, `{count}`, `{reviews}`. Sections `**System**` et `**User**` détectées automatiquement |
 | `prompt_criteres` | Prompt Perplexity pour générer les critères (placeholder `#MotClesprincipal`) |
+| `prompt_criteres_auto` | Prompt IA pour auto-générer les 5 critères d'achat — placeholder `{keyword}` — retourne JSON `[{ critere, explication }]` |
 | `prompt_humaniser` | Prompt template pour humaniser les fiches produits — placeholders : `{media.toneDescription}`, `{media.writingStyle}`, `{{fiche_produit_v1}}` |
 | `prompt_resume` | Prompt pour résumer l'article — placeholder : `{article}` |
 | `prompt_chapo` | Prompt chapô (30 mots) + introduction (100 mots) — placeholders : `{media.name}`, `{media.toneDescription}`, `{media.writingStyle}`, `{forbiddenWords}`, `{keyword}`, `{resume}`, `{planSection}` (= brief + mots-clés du chapô et de l'introduction depuis le plan JSON) |
@@ -207,30 +208,26 @@ La création d'un guide se fait en 6 étapes enchaînées naturellement :
 - Scraping Apify + analyse IA (modèle `model_analysis`) → status `products-ready`
 
 ### Étape 3 — Générer le plan (Tab Plan)
-- Saisir/modifier les critères de sélection des produits (textarea éditable + bouton "Générer via Perplexity")
+- Critères de sélection : textarea éditable + bouton **"Générer (IA)"** (`POST /api/guides/[id]/criteres-auto`) + bouton "Perplexity"
 - Sauvegarder les critères via `PATCH /api/guides/[id]`
 - Bouton "Générer le plan (IA)" → `POST /api/guides/[id]/plan` → polling toutes les 3s
-- IA génère le plan (modèle `model_plan`) avec les résumés produits + mots-clés + critères
+- IA génère le plan (modèle `model_generation`) avec les résumés produits + mots-clés + critères
+- **Prompt plan obligatoire sur le média** (`media.promptPlan`) — erreur si vide, plus de fallback hardcodé
 - Résultat dans `guide.planHtml` → affiché dans RichEditor (éditable)
 
 ### Étape 4 — Générer l'article (Tab Article)
-- Bouton "Générer l'article (IA)" → `POST /api/guides/[id]/article` → polling toutes les 3s
-- Pipeline complet :
-  1. Distribution mots-clés (status: distributing)
-  2. Génération fiche par produit (status: generating, currentStep 1/N)
-  3. Résumé de l'article (status: summarizing) — ~200 mots, sauvé dans `articleSummary`
-  4. 5 appels parallèles (status: enriching) : chapô+intro, sommaire, critères sélection, FAQ, méta+slug
-  5. Assemblage final : chapô + sommaire + critères + fiches + FAQ → `guideHtml`
-- MetaFields (slug, meta title, meta description, légende) pré-remplis automatiquement par l'IA
-- Résultat dans `guide.guideHtml` → affiché dans RichEditor (éditable)
+- **Un seul onglet "Article"** (l'ancien onglet V1 a été supprimé, l'ancien V2 renommé en "Article")
+- Bouton **"Générer l'article"** → enchaîne automatiquement V1 puis V2 :
+  1. `POST /api/guides/[id]/article` → distributing → generating (1/N) → summarizing → enriching → complete
+  2. Automatiquement : `POST /api/guides/[id]/humanize` → humanizing → complete
+- Progression détaillée affichée : phase + pourcentage
+- Au clic, les contenus existants (HTML, H1, meta, score SEO) sont vidés
+- Bouton secondaire **"Humaniser"** (visible si V1 existe) : ré-humanise sans régénérer V1
+- Bouton **"Intro + FAQ"** : relance uniquement chapô+intro et FAQ sur la V2
+- Collapsible **"Article V1 (original)"** : affiche le V1 en lecture seule
+- Résultat V2 dans `guide.guideHtmlV2` → affiché dans RichEditor (éditable)
 
-### Étape 5 — Humaniser l'article (Tab Article V2)
-- Bouton "Générer l'article V2 (Humaniser)" → `POST /api/guides/[id]/humanize` → polling toutes les 3s
-- Charge le prompt `prompt_humaniser` depuis AppConfig, résout placeholders média + `{{fiche_produit_v1}}`
-- Appelle l'IA (modèle `model_generation`) pour réécrire l'article V1 en style humain
-- Résultat dans `guide.guideHtmlV2` → affiché dans RichEditor (éditable)
-
-### Étape 6 — Corrections (hors scope)
+### Étape 5 — Corrections (hors scope)
 
 **Règle fraîcheur scraping** : si un ProductIntelligence a moins de 180 jours, il n'est pas re-scrappé.
 
@@ -298,12 +295,12 @@ Au submit du formulaire de création :
 | `/` | Page d'accueil avec bouton "Générer un guide" |
 | `/guides` | Liste des guides |
 | `/guides/nouveau` | Formulaire création guide (keyword + media uniquement) |
-| `/guides/[id]` | Détail guide : 5 onglets (Vue d'ensemble, Produits, Plan, Article, Article V2) avec vraies données API |
+| `/guides/[id]` | Détail guide : 4 onglets (Vue d'ensemble, Produits, Plan, Article) avec vraies données API |
 | `/medias` | Profils éditoriaux (ton, style, template) |
 | `/produits` | Produits scrappés (page existante mais **retirée du menu** — redondante avec /intelligence) |
 | `/intelligence` | Produits : données scrappées + analyses IA structurées |
 | `/playground` | Playground : sélecteur guide → produit → prompt résolu complet → génération V1 → humanisation V2 |
-| `/parametres` | Config runtime : 3 onglets — Prompts (11 sous-onglets dont Interdits lexicaux), Clés API (2 sélecteurs modèle IA + 4 clés API), Doc |
+| `/parametres` | Config runtime : 3 onglets — Prompts (13 sous-onglets dont Critères auto IA, Interdits lexicaux), Clés API (2 sélecteurs modèle IA + 4 clés API), Doc |
 
 ---
 
@@ -350,17 +347,16 @@ git push
 
 ## Refonte page /guides/[id] — architecture finale
 
-Architecture à 5 onglets avec **vraies données API** (plus de fixtures) :
-- **Vue d'ensemble** : infos guide (wordCount min/max, moyenne, produits recommandés), mots-clés collapsible triés par importance, bouton "Ajouter des produits" (visible tant que l'étape produits n'est pas "done"), progression des 6 étapes
+Architecture à **4 onglets** avec **vraies données API** (plus de fixtures) :
+- **Vue d'ensemble** : infos guide (wordCount min/max, moyenne, produits recommandés), mots-clés collapsible triés par importance, bouton "Ajouter des produits" (visible tant que l'étape produits n'est pas "done"), progression des 5 étapes (les 2 étapes article pointent vers le même onglet)
 - **Produits** : ajout ASIN(s), suppression avec AlertDialog de confirmation, lancer scraping, polling temps réel
-- **Plan** : critères de sélection éditables + bouton Perplexity + bouton "Générer le plan (IA)" pleine largeur (sauvegarde auto critères, critères obligatoires) + polling + RichEditor TipTap + bouton "Valider le plan →" (sauvegarde planHtml + bascule vers onglet Article)
-- **Article** : bouton sticky "Générer l'article (IA)" pleine largeur + barre de progression par produit + polling + RichEditor TipTap + "Éléments SEO" collapsible
-- **Article V2** : bouton sticky "Générer l'article V2 (Humaniser)" pleine largeur + barre de progression + polling + RichEditor TipTap + "Éléments SEO" collapsible. Désactivé tant que l'article V1 n'est pas généré
+- **Plan** : critères de sélection éditables + bouton **"Générer (IA)"** (auto-génération critères) + bouton Perplexity + bouton "Générer le plan (IA)" pleine largeur (sauvegarde auto critères, critères obligatoires) + polling + RichEditor TipTap + bouton "Valider le plan →" (sauvegarde planHtml + bascule vers onglet Article)
+- **Article** : bouton "Générer l'article" (enchaîne V1→V2 automatiquement) + bouton "Humaniser" (ré-humanise V1) + barre de progression détaillée par phase + polling + RichEditor TipTap + collapsible "Article V1 (original)" en lecture seule
 
 **Règles UX importantes :**
-- Collapsible **"Titre H1"** → Article V1 et V2, avec champ H1 éditable + 10 propositions cliquables + bouton Sauvegarder
-- Collapsible **"Éléments SEO"** (Slug, Meta title, Meta description, Légende image) → Article V1 et V2, avec bouton Sauvegarder
-- Bouton **"Intro + FAQ"** → Article V1 et V2, relance uniquement chapô+intro et FAQ sans regénérer tout l'article
+- Collapsible **"Titre H1"** → onglet Article, avec champ H1 éditable + 10 propositions cliquables + bouton Sauvegarder
+- Collapsible **"Éléments SEO"** (Slug, Meta title, Meta description, Légende image) → onglet Article, avec bouton Sauvegarder
+- Bouton **"Intro + FAQ"** → onglet Article, relance uniquement chapô+intro et FAQ sans regénérer tout l'article
 - Barre d'outils RichEditor : Gras, Italique, Souligné | **H1**, H2, H3 | Liste, Liste numérotée | Tableau
 - Chaque tab reçoit `guideId` + `onRefresh` pour se connecter aux API et recharger les données
 - `TabPlan` reçoit aussi `onTabChange` pour basculer vers l'onglet Article après validation du plan
@@ -622,3 +618,15 @@ Champs **retirés de l'UI média** (restent en DB) : `productStructureTemplate`,
 | 2026-03-25 | Tab Article V2 : détecte automatiquement une humanisation en cours (lancée par V1) et affiche la progression |
 | 2026-03-25 | Collapsible "Article V1 (original)" dans Tab Article V2 — fermé par défaut, affiche le HTML V1 en lecture seule |
 | 2026-03-25 | Champ `Brief` rendu optionnel sur `PlanProduct` — peut être retiré du `planOutputStructure` sans casser la chaîne |
+| 2026-03-27 | Onglet "Article" (V1) supprimé, "Article V2" renommé en "Article" — le V1 reste visible en collapsible |
+| 2026-03-27 | Bouton "Générer l'article" enchaîne V1 → V2 automatiquement avec progression détaillée par phase |
+| 2026-03-27 | Au clic "Générer l'article", les contenus existants (HTML, H1, meta, score SEO) sont vidés |
+| 2026-03-27 | Bouton secondaire "Humaniser" visible quand V1 existe — ré-humanise sans régénérer V1 |
+| 2026-03-27 | Auto-detect au montage : reprend le polling si une génération V1 ou humanisation est déjà en cours |
+| 2026-03-27 | Suppression `tab-article.tsx` (remplacé par `tab-article-v2.tsx` qui gère V1+V2) |
+| 2026-03-27 | Tab Overview : 2 étapes article (rédigé + humanisé) pointent vers le même onglet "article" |
+| 2026-03-27 | Prompt plan obligatoire sur le média (`media.promptPlan`) — plus de fallback `DEFAULT_PLAN_PROMPT` en production |
+| 2026-03-27 | Bouton "Générer (IA)" dans Tab Plan — auto-génère les 5 critères d'achat via `POST /api/guides/[id]/criteres-auto` |
+| 2026-03-27 | Nouveau prompt `prompt_criteres_auto` (clé AppConfig) — placeholder `{keyword}`, retourne JSON `[{ critere, explication }]` |
+| 2026-03-27 | Sous-onglet "Criteres auto (IA)" dans Paramètres > Prompts |
+| 2026-03-27 | Fix apostrophe non échappée dans `src/app/page.tsx` |
