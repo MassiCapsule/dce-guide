@@ -21,7 +21,6 @@ import {
 import { TabOverview } from "@/components/guides/tabs/tab-overview";
 import { TabProducts } from "@/components/guides/tabs/tab-products";
 import { TabPlan } from "@/components/guides/tabs/tab-plan";
-import { TabArticle } from "@/components/guides/tabs/tab-article";
 import { TabArticleV2 } from "@/components/guides/tabs/tab-article-v2";
 
 interface GuideProduct {
@@ -231,7 +230,6 @@ export default function GuideDetailPage() {
             <TabsTrigger value="products">Produits</TabsTrigger>
             <TabsTrigger value="plan">Plan</TabsTrigger>
             <TabsTrigger value="article">Article</TabsTrigger>
-            <TabsTrigger value="article-v2">Article V2</TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview">
@@ -265,20 +263,6 @@ export default function GuideDetailPage() {
           </TabsContent>
 
           <TabsContent value="article">
-            <TabArticle
-              guideId={id}
-              initialHtml={guide.guideHtml}
-              seoScore={guide.seoScore ?? null}
-              seoKeywords={(() => { try { return JSON.parse(guide.seoKeywords); } catch { return []; } })()}
-              serpanticsUrl={guide.serpanticsGuideId ? `https://app.serpmantics.com/${guide.serpanticsGuideId}/edit` : undefined}
-              meta={{ slug: guide.slug || "", metaTitle: guide.metaTitle || "", metaDescription: guide.metaDescription || "", imageCaption: guide.imageCaption || "" }}
-              h1Alternatives={(() => { try { return JSON.parse(guide.h1Alternatives || "[]"); } catch { return []; } })()}
-              onRefresh={loadGuide}
-              onTabChange={setActiveTab}
-            />
-          </TabsContent>
-
-          <TabsContent value="article-v2">
             <TabArticleV2
               guideId={id}
               initialHtml={guide.guideHtmlV2}

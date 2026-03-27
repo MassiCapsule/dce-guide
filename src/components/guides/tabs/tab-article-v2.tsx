@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Loader2, ChevronDown, ChevronUp, Sparkles, RefreshCw } from "lucide-react";
+import { Loader2, ChevronDown, ChevronUp, Sparkles, RefreshCw, Wand2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SeoScoreBar } from "@/components/editor/seo-score-bar";
@@ -33,6 +33,30 @@ interface TabArticleV2Props {
   h1Alternatives?: string[];
   initialHtmlV1?: string;
   onRefresh: () => void;
+}
+
+type Phase = "idle" | "distributing" | "generating" | "summarizing" | "enriching" | "humanizing" | "complete";
+
+const PHASE_LABELS: Record<Phase, string> = {
+  idle: "",
+  distributing: "Distribution des mots-clés…",
+  generating: "Génération des fiches…",
+  summarizing: "Résumé de l'article…",
+  enriching: "Enrichissements (intro, FAQ, méta)…",
+  humanizing: "Humanisation en cours…",
+  complete: "Terminé",
+};
+
+function phaseToProgress(phase: Phase, currentStep: number): number {
+  switch (phase) {
+    case "distributing": return 5;
+    case "generating": return 10 + Math.min(currentStep * 8, 40);
+    case "summarizing": return 55;
+    case "enriching": return 65;
+    case "humanizing": return 75;
+    case "complete": return 100;
+    default: return 0;
+  }
 }
 
 function extractH1(htmlStr: string): string {
@@ -69,68 +93,123 @@ export function TabArticleV2({
   const [seoOpen, setSeoOpen] = useState<boolean>(false);
   const [v1Open, setV1Open] = useState<boolean>(false);
   const [progress, setProgress] = useState<number>(0);
+  const [phase, setPhase] = useState<Phase>("idle");
+  const [currentStep, setCurrentStep] = useState<number>(0);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  // Auto-detect si humanisation en cours (lancée par V1)
-  useEffect(() => {
-    if (!initialHtml && hasV1) {
-      // Pas de V2 mais V1 existe → vérifier si humanisation en cours
-      (async () => {
-        const res = await fetch(`/api/guides/${guideId}/status`);
-        if (!res.ok) return;
-        const data = await res.json();
-        if (data.status === "humanizing") {
-          setGenerating(true);
-          setProgress(10);
-          // Progression simulée
-          let tick = 10;
-          const progressInterval = setInterval(() => {
-            tick = Math.min(tick + 3, 90);
-            setProgress(tick);
-          }, 2000);
-          // Polling
-          pollRef.current = setInterval(async () => {
-            const pollRes = await fetch(`/api/guides/${guideId}/status`);
-            if (!pollRes.ok) return;
-            const d = await pollRes.json();
-            if (d.status === "complete") {
-              clearInterval(progressInterval);
-              setProgress(100);
-              setGenerating(false);
-              stopPolling();
-              const guideRes = await fetch(`/api/guides/${guideId}`);
-              if (guideRes.ok) {
-                const guide = await guideRes.json();
-                setHtml(guide.guideHtmlV2 || "");
-                setCurrentH1(extractH1(guide.guideHtmlV2 || ""));
-              }
-              setTimeout(() => setProgress(0), 1500);
-              onRefresh();
-            } else if (d.status === "error") {
-              clearInterval(progressInterval);
-              setGenerateError(d.errorMessage || "Erreur inconnue");
-              setGenerating(false);
-              setProgress(0);
-              stopPolling();
-            }
-          }, 3000);
-        }
-      })();
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  useEffect(() => {
-    setHtml(initialHtml);
-    setCurrentH1(extractH1(initialHtml));
-  }, [initialHtml]);
+  const progressIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   function stopPolling() {
     if (pollRef.current) {
       clearInterval(pollRef.current);
       pollRef.current = null;
     }
+    if (progressIntervalRef.current) {
+      clearInterval(progressIntervalRef.current);
+      progressIntervalRef.current = null;
+    }
   }
+
+  // Auto-detect si génération ou humanisation en cours
+  useEffect(() => {
+    (async () => {
+      const res = await fetch(`/api/guides/${guideId}/status`);
+      if (!res.ok) return;
+      const data = await res.json();
+      const s = data.status as string;
+
+      // V1 en cours ou humanisation en cours → reprendre le polling
+      const v1Phases = ["distributing", "generating", "summarizing", "enriching"];
+      if (v1Phases.includes(s) || s === "humanizing") {
+        setGenerating(true);
+        setPhase(s as Phase);
+        setCurrentStep(data.currentStep || 0);
+        setProgress(phaseToProgress(s as Phase, data.currentStep || 0));
+        startPolling(s === "humanizing");
+      }
+    })();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function startPolling(humanizePhase: boolean) {
+    // Progression simulée pendant humanisation (pas de steps intermédiaires)
+    if (humanizePhase) {
+      let tick = 75;
+      progressIntervalRef.current = setInterval(() => {
+        tick = Math.min(tick + 2, 95);
+        setProgress(tick);
+      }, 2000);
+    }
+
+    pollRef.current = setInterval(async () => {
+      const pollRes = await fetch(`/api/guides/${guideId}/status`);
+      if (!pollRes.ok) return;
+      const data = await pollRes.json();
+      const s = data.status as string;
+
+      if (s === "error") {
+        setGenerateError(data.errorMessage || "Erreur inconnue");
+        setGenerating(false);
+        setPhase("idle");
+        setProgress(0);
+        stopPolling();
+        return;
+      }
+
+      if (s === "complete") {
+        stopPolling();
+        setPhase("complete");
+        setProgress(100);
+        const guideRes = await fetch(`/api/guides/${guideId}`);
+        if (guideRes.ok) {
+          const guide = await guideRes.json();
+          // Si V2 existe, on l'affiche. Sinon, V1 vient de finir → lancer humanisation
+          if (guide.guideHtmlV2) {
+            setHtml(guide.guideHtmlV2);
+            setCurrentH1(extractH1(guide.guideHtmlV2));
+            setGenerating(false);
+            setTimeout(() => setProgress(0), 1500);
+            onRefresh();
+          } else if (guide.guideHtml) {
+            // V1 terminée, pas encore de V2 → lancer humanisation
+            launchHumanize();
+          }
+        }
+        return;
+      }
+
+      // Mise à jour phase V1
+      const validPhases: Phase[] = ["distributing", "generating", "summarizing", "enriching", "humanizing"];
+      if (validPhases.includes(s as Phase)) {
+        setPhase(s as Phase);
+        setCurrentStep(data.currentStep || 0);
+        if (s !== "humanizing") {
+          setProgress(phaseToProgress(s as Phase, data.currentStep || 0));
+        }
+      }
+    }, 3000);
+  }
+
+  async function launchHumanize() {
+    setPhase("humanizing");
+    setProgress(75);
+
+    const res = await fetch(`/api/guides/${guideId}/humanize`, { method: "POST" });
+    if (!res.ok) {
+      const data = await res.json();
+      setGenerateError(data.error || "Erreur démarrage humanisation");
+      setGenerating(false);
+      setPhase("idle");
+      setProgress(0);
+      return;
+    }
+
+    startPolling(true);
+  }
+
+  useEffect(() => {
+    setHtml(initialHtml);
+    setCurrentH1(extractH1(initialHtml));
+  }, [initialHtml]);
 
   useEffect(() => () => stopPolling(), []);
 
@@ -170,54 +249,51 @@ export function TabArticleV2({
     }
   };
 
+  // Bouton principal : génère V1 puis V2
+  async function handleGenerate() {
+    // Vider les contenus existants pour repartir de zéro
+    setHtml("");
+    setCurrentH1("");
+    setMeta({ slug: "", metaTitle: "", metaDescription: "", imageCaption: "" });
+    setScore(null);
+    setKeywords([]);
+    setGenerating(true);
+    setGenerateError(null);
+    setPhase("distributing");
+    setProgress(5);
+    setCurrentStep(0);
+
+    const res = await fetch(`/api/guides/${guideId}/article`, { method: "POST" });
+    if (!res.ok) {
+      const data = await res.json();
+      setGenerateError(data.error || "Erreur démarrage");
+      setGenerating(false);
+      setPhase("idle");
+      setProgress(0);
+      return;
+    }
+
+    startPolling(false);
+  }
+
+  // Bouton secondaire : humanise V1 existante
   async function handleHumanize() {
     setGenerating(true);
     setGenerateError(null);
-    setProgress(10);
+    setPhase("humanizing");
+    setProgress(75);
 
     const res = await fetch(`/api/guides/${guideId}/humanize`, { method: "POST" });
     if (!res.ok) {
       const data = await res.json();
       setGenerateError(data.error || "Erreur démarrage");
       setGenerating(false);
+      setPhase("idle");
       setProgress(0);
       return;
     }
 
-    // Progression simulée pendant l'attente (l'humanisation est un seul appel IA)
-    let tick = 10;
-    const progressInterval = setInterval(() => {
-      tick = Math.min(tick + 3, 90);
-      setProgress(tick);
-    }, 2000);
-
-    // Polling toutes les 3s
-    pollRef.current = setInterval(async () => {
-      const pollRes = await fetch(`/api/guides/${guideId}/status`);
-      if (!pollRes.ok) return;
-      const data = await pollRes.json();
-
-      if (data.status === "complete") {
-        clearInterval(progressInterval);
-        setProgress(100);
-        setGenerating(false);
-        stopPolling();
-        const guideRes = await fetch(`/api/guides/${guideId}`);
-        if (guideRes.ok) {
-          const guide = await guideRes.json();
-          setHtml(guide.guideHtmlV2 || "");
-          setCurrentH1(extractH1(guide.guideHtmlV2 || ""));
-        }
-        setTimeout(() => setProgress(0), 1500);
-        onRefresh();
-      } else if (data.status === "error") {
-        clearInterval(progressInterval);
-        setGenerateError(data.errorMessage || "Erreur inconnue");
-        setGenerating(false);
-        setProgress(0);
-        stopPolling();
-      }
-    }, 3000);
+    startPolling(true);
   }
 
   async function handleRegenerateIntroFaq() {
@@ -258,6 +334,10 @@ export function TabArticleV2({
       }
     }, 3000);
   }
+
+  const phaseLabel = phase === "generating" && currentStep > 0
+    ? `Génération fiche ${currentStep}…`
+    : PHASE_LABELS[phase];
 
   return (
     <div className="space-y-4 pb-20">
@@ -382,7 +462,7 @@ export function TabArticleV2({
             <div className="flex items-center justify-between text-sm">
               <span className="flex items-center gap-2 font-medium">
                 <Loader2 className="h-4 w-4 animate-spin" />
-                Humanisation en cours…
+                {phaseLabel}
               </span>
               <span className="text-muted-foreground">{progress}%</span>
             </div>
@@ -394,45 +474,51 @@ export function TabArticleV2({
           <p className="text-sm text-red-600 mb-2">{generateError}</p>
         )}
 
-        {!hasV1 && (
-          <p className="text-sm text-muted-foreground mb-2">
-            L&apos;article V1 doit être généré avant de pouvoir humaniser.
-          </p>
-        )}
-
         <div className="flex gap-2">
           <Button
-            onClick={handleHumanize}
-            disabled={generating || regenerating || !hasV1}
+            onClick={handleGenerate}
+            disabled={generating || regenerating}
             className="flex-1"
             size="lg"
           >
             {generating ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Humanisation en cours…
+                Génération en cours…
               </>
             ) : (
               <>
                 <Sparkles className="mr-2 h-4 w-4" />
-                Générer l&apos;article V2 (Humaniser)
-            </>
-          )}
+                Générer l&apos;article
+              </>
+            )}
           </Button>
           {hasV1 && (
-            <Button
-              onClick={handleRegenerateIntroFaq}
-              disabled={generating || regenerating}
-              variant="outline"
-              size="lg"
-            >
-              {regenerating ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <RefreshCw className="h-4 w-4" />
-              )}
-              <span className="ml-2 hidden sm:inline">Intro + FAQ</span>
-            </Button>
+            <>
+              <Button
+                onClick={handleHumanize}
+                disabled={generating || regenerating}
+                variant="outline"
+                size="lg"
+                title="Ré-humaniser l'article V1 existant"
+              >
+                <Wand2 className="h-4 w-4" />
+                <span className="ml-2 hidden sm:inline">Humaniser</span>
+              </Button>
+              <Button
+                onClick={handleRegenerateIntroFaq}
+                disabled={generating || regenerating}
+                variant="outline"
+                size="lg"
+              >
+                {regenerating ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <RefreshCw className="h-4 w-4" />
+                )}
+                <span className="ml-2 hidden sm:inline">Intro + FAQ</span>
+              </Button>
+            </>
           )}
         </div>
       </div>

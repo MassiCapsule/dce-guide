@@ -43,7 +43,7 @@ const STEPS = [
   { key: "products", label: "Produits récupérés", tab: "products" },
   { key: "plan", label: "Plan d'article", tab: "plan" },
   { key: "article", label: "Article rédigé", tab: "article" },
-  { key: "articleV2", label: "Article V2 (humanisé)", tab: "article-v2" },
+  { key: "articleV2", label: "Article humanisé", tab: "article" },
 ] as const;
 
 export function TabOverview({ data, onTabChange }: TabOverviewProps) {
