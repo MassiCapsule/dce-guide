@@ -39,7 +39,7 @@ type Phase = "idle" | "distributing" | "generating" | "summarizing" | "enriching
 
 const PHASE_LABELS: Record<Phase, string> = {
   idle: "",
-  distributing: "Distribution des mots-clés…",
+  distributing: "Lancement de la génération…",
   generating: "Génération des fiches…",
   summarizing: "Résumé de l'article…",
   enriching: "Enrichissements (intro, FAQ, méta)…",
